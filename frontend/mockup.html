@@ -273,7 +273,7 @@
   </div>
 
   <div class="grp">
-    <h4>Crystal Ball <span class="info" title="Scenario forecaster — fuses ChaosEngine tail-risk with xpyq eigendecomposition">?</span></h4>
+    <h4>Crystal Ball <span class="info" title="Scenario forecaster — fuses Chaos Engine tail-risk with xpyq eigendecomposition">?</span></h4>
     <div class="chk"><input type="checkbox" id="cb_on" checked/><span>Enable Crystal Ball forecast</span></div>
     <label>Horizon</label>
     <select id="cb_horizon">
@@ -340,7 +340,7 @@
     <span class="arrow">→</span>
     <span class="node cb">Crystal Ball</span>
     <span class="arrow">→</span>
-    <span class="node" id="flow_chaos" style="border-color:#f87171;color:#f87171">ChaosEngine</span>
+    <span class="node" id="flow_chaos" style="border-color:#f87171;color:#f87171">Chaos Engine</span>
     <span class="arrow" id="flow_chaos_arrow">→</span>
     <span class="node">score</span>
   </div>
@@ -423,7 +423,7 @@
       </div>
       <div class="lbl">per-ticker reasoning</div>
       <div class="reason"><b>GOLD</b> — dominant commodity factor eigenvector loading 0.61; inflation hedge signal active</div>
-      <div class="reason"><b>OIL</b> — factor momentum +14.2 % (60d); supply-shock regime detected by ChaosEngine</div>
+      <div class="reason"><b>OIL</b> — factor momentum +14.2 % (60d); supply-shock regime detected by Chaos Engine</div>
       <div class="reason"><b>NVDA</b> — highest pred. Sharpe 2.41; AI-demand backcast analogue positive 78 % of windows</div>
       <div class="reason"><b>HOUSING</b> — rate-sensitive but low correlation to equity bloc (ρ = 0.18); diversification gain</div>
       <div class="lbl">rejected runners-up</div>
@@ -507,14 +507,14 @@
         <div class="reason">picks <b style="color:var(--meta)">quantum</b> → GOLD, OIL, NVDA, HOUSING</div>
         <div class="reason" style="color:var(--mut);margin-top:6px">Both agents agree on 3 of 4 tickers.
           HOUSING preferred over RESIDENTIAL: broader REIT ETF provides more rate-beta
-          diversification when ChaosEngine signals elevated crash probability (0.60).</div>
+          diversification when Chaos Engine signals elevated crash probability (0.60).</div>
       </div>
       <div class="think">
         <div class="lbl" style="margin-top:0;color:var(--meta)">what it thinks</div>
         <div class="r">Both agents converge on GOLD + OIL as the commodity core — this agreement in a
           multi-asset universe is a strong confirmation signal. The 60-day commodity factor backcast
           shows 71 % positive-return analogues, distinctly better than the real-estate bloc (34 %).
-          I favour HOUSING over RESIDENTIAL because the ChaosEngine's elevated crash probability
+          I favor HOUSING over RESIDENTIAL because the Chaos Engine's elevated crash probability
           (0.60) makes the broader, lower-vol REIT a safer anchor than the sector-specific RESIDENTIAL ETF.
           NVDA remains the sole equity exposure — the AI-demand second-curve is still emerging
           and the pred. Sharpe (2.41) is the highest in the universe. Position sizes should
@@ -534,7 +534,7 @@
       <span class="badge live a-live">xpyq eigendecomposition</span>
     </div>
     <div class="reason" style="color:var(--mut);margin-bottom:4px">
-      IFTF Futures Thinking framework · Principles 2 (signals) · 3 (backcasting) · 4 (Two Curves)
+      IFTF futures methodology · Principles 2 (signals) · 3 (backcasting) · 4 (Two Curves)
       · Per-asset-class thresholds · Dominant factor variance 0.2697
     </div>
 
@@ -749,7 +749,7 @@
       <div style="font-size:12px;color:var(--mut);margin-bottom:10px">
         Base: short-horizon expected return compounded to 1 year.
         Bull/Bear: base ± 1.5 × annual vol (from xpyq eigendecomposition of the covariance matrix).
-        Crash-adj: base × ChaosEngine per-ticker weight multiplier.
+        Crash-adj: base × Chaos Engine per-ticker weight multiplier.
       </div>
       <!-- Equities -->
       <div class="cb-section">
@@ -938,12 +938,12 @@
     </div>
   </div><!-- /crystal ball -->
 
-  <!-- ===== ChaosEngine panel ===== -->
+  <!-- ===== Chaos Engine panel ===== -->
   <div style="height:16px"></div>
   <div class="card full chaos" id="chaos_panel">
     <div class="chead">
       <div class="ctitle" style="color:#f87171">
-        <span class="dot" style="background:#f87171"></span>ChaosEngine — Event Probability Assessment
+        <span class="dot" style="background:#f87171"></span>Chaos Engine — Event Probability Assessment
       </div>
       <span class="badge live" style="background:#f59e0b;border-color:#f59e0b;color:#06121f">MODERATE — CAUTION</span>
     </div>
@@ -1005,7 +1005,7 @@
         <div class="sig"><div class="k">corr momentum 20d</div><div class="v">+0.38</div></div>
         <div class="sig"><div class="k">VIX-proxy</div><div class="v">22.1</div></div>
       </div>
-      <pre style="margin-top:10px">ChaosEngine evaluation @ 2026-05-29
+      <pre style="margin-top:10px">Chaos Engine evaluation @ 2026-05-29
 
 Feature vector:
   vol_20d            = 0.1837

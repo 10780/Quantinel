@@ -9,7 +9,7 @@
     --bg:#0a0e17; --panel:#121826; --panel2:#0f1420; --line:#222c40;
     --ink:#e6ecf5; --mut:#8b97ad; --quantum:#a78bfa; --ml:#34d399;
     --meta:#fbbf24; --accent:#38bdf8; --bad:#f87171; --good:#34d399;
-    --ibm:#60a5fa;
+    --ibm:#60a5fa; --cmd:#fbbf24; --re:#34d399;
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
@@ -48,6 +48,8 @@
   .tkbtn{padding:5px 9px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);
     color:var(--mut);font-size:12px;font-weight:700;cursor:pointer}
   .tkbtn.on{background:var(--accent);border-color:var(--accent);color:#06121f}
+  .tkbtn.on.cmd{background:var(--cmd);border-color:var(--cmd)}
+  .tkbtn.on.re{background:var(--re);border-color:var(--re)}
   .addrow{display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:8px}
   .addrow button{border:1px solid var(--line);background:var(--panel2);color:var(--ink);
     border-radius:8px;padding:0 12px;cursor:pointer;font-weight:700}
@@ -61,6 +63,7 @@
   .node.q{border-color:var(--quantum);color:var(--quantum)}
   .node.m{border-color:var(--ml);color:var(--ml)}
   .node.x{border-color:var(--meta);color:var(--meta)}
+  .node.cb{border-color:var(--accent);color:var(--accent)}
   .arrow{color:var(--line)}
   .cards{display:grid;grid-template-columns:1fr 1fr;gap:16px}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
@@ -76,6 +79,10 @@
   .badge{font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);
     color:var(--mut)}
   .badge.live{color:#06121f;background:var(--accent);border-color:var(--accent);font-weight:700}
+  .badge.q-live{background:var(--quantum);border-color:var(--quantum)}
+  .badge.m-live{background:var(--ml);border-color:var(--ml)}
+  .badge.x-live{background:var(--meta);border-color:var(--meta)}
+  .badge.a-live{background:var(--accent);border-color:var(--accent)}
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 12px}
   .chip{padding:4px 10px;border-radius:8px;font-size:13px;font-weight:700;
     background:var(--panel2);border:1px solid var(--line)}
@@ -143,8 +150,24 @@
   .adj-box.adj-short{border-color:var(--bad)}
   .adj-box.adj-reduce{border-color:var(--meta)}
   .adj-box.adj-hold{border-color:var(--good)}
+  /* ---- crystal ball ---- */
+  .card.cb-card{border-color:var(--accent);background:linear-gradient(180deg,#06161f44,var(--panel))}
+  .cls-eq{font-size:10px;padding:1px 6px;border-radius:999px;border:1px solid var(--mut);color:var(--mut)}
+  .cls-cmd{font-size:10px;padding:1px 6px;border-radius:999px;border:1px solid var(--cmd);color:var(--cmd)}
+  .cls-re{font-size:10px;padding:1px 6px;border-radius:999px;border:1px solid var(--re);color:var(--re)}
+  .crash-prob-bar{height:16px;border-radius:8px;background:var(--panel2);overflow:hidden;margin:6px 0}
+  .crash-prob-bar span{display:block;height:100%}
+  .cb-section{margin:14px 0 8px;padding:10px 14px;background:var(--panel2);border:1px solid var(--line);border-radius:10px}
+  .cb-section h5{margin:0 0 8px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+  .cb-ticker-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+  .cb-ticker-row:last-child{border-bottom:none}
+  .scenario-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;flex:1}
+  .sc-box{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:5px 8px;text-align:center}
+  .sc-box .sv{font-size:13px;font-weight:700} .sc-box .sk{font-size:10px;color:var(--mut)}
+  .sc-box.bull .sv{color:var(--good)} .sc-box.bear .sv,.sc-box.crash .sv{color:var(--bad)}
+  .sc-box.base .sv{color:var(--accent)}
   @media(max-width:1000px){.wrap{grid-template-columns:1fr}.side{position:static;height:auto}
-    .cards,.meta-grid,.stat{grid-template-columns:1fr}}
+    .cards,.meta-grid,.stat,.scenario-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -199,6 +222,23 @@
     </div>
 
     <div class="grp">
+      <h4>Crystal Ball</h4>
+      <div class="chk"><input id="use_cb" type="checkbox" checked/><span>Enable Crystal Ball forecast</span></div>
+      <label>Horizon</label>
+      <select id="cb_horizon">
+        <option value="63">3 months (63 d)</option>
+        <option value="126">6 months (126 d)</option>
+        <option value="252" selected>1 year (252 d)</option>
+        <option value="504">2 years (504 d)</option>
+      </select>
+      <label>Vol-surge threshold (equity) <span class="val" id="vsv">1.8</span>×</label>
+      <input id="cb_vs" type="range" min="1.2" max="3.0" step="0.1" value="1.8"/>
+      <label>Drawdown warning floor (equity) <span class="val" id="ddv">8</span>%</label>
+      <input id="cb_dd" type="range" min="3" max="20" value="8"/>
+      <div class="tag" style="margin:6px 0 0">Fuses xpyq eigendecomposition with ChaosEngine tail-risk. Per-asset-class signal thresholds.</div>
+    </div>
+
+    <div class="grp">
       <h4>Quantum backend</h4>
       <div class="chk"><input id="use_xpyq" type="checkbox"/><span>Use xpyq in pipeline run</span></div>
       <label>Pipeline poll budget <span class="val" id="ptv">60</span>s</label>
@@ -237,15 +277,15 @@
   <!-- ============ MAIN ============ -->
   <main class="main">
     <h2>Multi-Agent Portfolio Selection</h2>
-    <div class="sub">QuantumAgent &amp; MLAgent each propose K assets; the MetaAgent reads both rationales and decides.</div>
+    <div class="sub">QuantumAgent &amp; MLAgent each propose K assets across equities, commodities &amp; real estate; the MetaAgent arbitrates. Crystal Ball projects scenario forecasts per asset class.</div>
     <div class="flow">
       <span class="node">data</span><span class="arrow">→</span>
       <span class="node q" id="f_q">QuantumAgent</span>
       <span class="node m" id="f_m">MLAgent</span>
       <span class="arrow">→</span>
       <span class="node x" id="f_x">MetaAgent</span>
-      <span class="arrow">→</span>
-      <span class="node" id="f_chaos" style="border-color:#f87171;color:#f87171;display:none">ChaosEngine</span>
+      <span class="arrow">→</span>      <span class="node cb" id="f_cb" style="display:none">Crystal Ball</span>
+      <span class="arrow" id="f_cb_arrow" style="display:none">→</span>      <span class="node" id="f_chaos" style="border-color:#f87171;color:#f87171;display:none">Chaos Engine</span>
       <span class="arrow" id="f_chaos_arrow" style="display:none">→</span>
       <span class="node">score</span>
     </div>
@@ -322,12 +362,21 @@ bind('shots','shv');
 bind('chaos_lookback','chlbv');
 bind('chaos_threshold','chthv',v=>Number(v).toFixed(1));
 bind('chaos_horizon','chhzv');
-// show/hide chaos flow node
+bind('cb_vs','vsv',v=>Number(v).toFixed(1));
+bind('cb_dd','ddv');
+// show/hide Crystal Ball and ChaosEngine flow nodes
+function syncCbFlow(){
+  const on=$('use_cb').checked;
+  $('f_cb').style.display=on?'':'none';
+  $('f_cb_arrow').style.display=on?'':'none';
+}
 function syncChaosFlow(){
   const on=$('use_chaos').checked;
   $('f_chaos').style.display=on?'':'none';
   $('f_chaos_arrow').style.display=on?'':'none';
 }
+$('use_cb').addEventListener('change',syncCbFlow);
+syncCbFlow();
 $('use_chaos').addEventListener('change',syncChaosFlow);
 syncChaosFlow();
 $('queue_round').addEventListener('input',()=>$('qr_lbl').textContent=$('queue_round').value);
@@ -343,8 +392,9 @@ function addTickerBtn(t,on,group){
   const wrap=$(group||'tk_btns');
   const existing=[...wrap.children].find(b=>b.dataset.t===t);
   if(existing){if(on) existing.classList.add('on'); return;}
+  const cls=group==='cm_btns'?'cmd':group==='re_btns'?'re':'eq';
   const b=document.createElement('button');
-  b.className='tkbtn'+(on?' on':''); b.dataset.t=t; b.textContent=t;
+  b.className='tkbtn '+cls+(on?' on':''); b.dataset.t=t; b.textContent=t;
   b.onclick=()=>b.classList.toggle('on');
   wrap.appendChild(b);
 }
@@ -384,6 +434,10 @@ function collectParams(){
     chaos_lookback:+$('chaos_lookback').value,
     chaos_threshold:+$('chaos_threshold').value/100,
     chaos_horizon:+$('chaos_horizon').value,
+    use_crystal_ball:$('use_cb').checked,
+    cb_horizon:+$('cb_horizon').value,
+    cb_vol_surge_equity:+$('cb_vs').value,
+    cb_drawdown_floor_equity:+$('cb_dd').value/100,
   };
 }
 
@@ -418,9 +472,10 @@ function agentCard(cls,name,p,extra){
   const sigs=Object.entries(p.rationale.key_signals).map(([k,v])=>`<div class="sig"><div class="k">${esc(k)}</div><div class="v">${fmt(v,4)}</div></div>`).join('');
   const cav=p.rationale.caveats.map(c=>`<div class="cav">⚠ ${esc(c)}</div>`).join('');
   const col=getComputedStyle(document.body).getPropertyValue(cls==='q'?'--quantum':'--ml');
+  const bdgCls=cls==='q'?'q-live':'m-live';
   return `<div class="card ${cls}">
     <div class="chead"><div class="ctitle"><span class="dot"></span>${name}</div>
-      <span class="badge live">${esc(p.backend||'—')}</span></div>
+      <span class="badge live ${bdgCls}">${esc(p.backend||'—')}</span></div>
     <div class="gauge">${gauge(p.confidence,col)}<div><div class="lbl" style="margin:0">confidence</div>
       <div style="font-size:13px;color:var(--mut)">${esc(p.rationale.summary)}</div></div></div>
     <div class="lbl">selected basket</div><div class="chips">${chips}</div>
@@ -528,6 +583,65 @@ function universePanel(u){
       <tbody>${rows}</tbody></table></div>`;
 }
 
+// ===================== crystal ball panel ====================================
+function crystalBallPanel(cb,universe){
+  if(!cb) return '';
+  const p=cb.crash_probability||0;
+  const pct100=(p*100).toFixed(1);
+  const col=p>=0.65?'var(--bad)':p>=0.40?'#f59e0b':'var(--good)';
+  const regime=p>=0.65?'HIGH — CRASH ALERT':p>=0.40?'CAUTION':'NORMAL';
+  const statBoxes=`<div class="stat" style="margin:12px 0">
+    <div class="box"><div class="v" style="color:${col}">${pct100}&nbsp;%</div><div class="k">crash probability</div></div>
+    <div class="box"><div class="v" style="color:${col}">${esc(regime)}</div><div class="k">risk regime</div></div>
+    <div class="box"><div class="v" style="color:var(--mut)">${fmt(cb.dominant_factor_var,4)}</div><div class="k">dominant factor var</div></div>
+  </div>`;
+  const bar=`<div class="crash-prob-bar"><span style="width:${pct100}%;background:linear-gradient(90deg,var(--good),var(--meta),var(--bad))"></span></div>`;
+  const clsMap={};
+  if(universe) universe.forEach(a=>{clsMap[a.ticker]=a.asset_class||'equity';});
+  const groups={equity:[],commodity:[],real_estate:[]};
+  Object.keys(cb.base_returns||{}).forEach(t=>{const c=clsMap[t]||'equity';if(!groups[c])groups[c]=[];groups[c].push(t);});
+  function scenRow(t){
+    const base=cb.base_returns[t]||0,bull=cb.bull_returns[t]||0;
+    const bear=cb.bear_returns[t]||0,crash=(cb.crash_adjusted_returns||{})[t]||0;
+    const vol=(cb.annual_volatility||{})[t];
+    return `<div class="cb-ticker-row" style="display:block;padding:8px 0">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-weight:700;min-width:110px">${esc(t)}</span>
+        ${vol!=null?`<span style="color:var(--mut);font-size:11px">ann. vol ${(vol*100).toFixed(1)}&nbsp;%</span>`:''}
+      </div>
+      <div class="scenario-grid">
+        <div class="sc-box base"><div class="sv">${base>=0?'+':''}${(base*100).toFixed(1)}&nbsp;%</div><div class="sk">base</div></div>
+        <div class="sc-box bull"><div class="sv">${bull>=0?'+':''}${(bull*100).toFixed(1)}&nbsp;%</div><div class="sk">bull</div></div>
+        <div class="sc-box bear"><div class="sv">${bear>=0?'+':''}${(bear*100).toFixed(1)}&nbsp;%</div><div class="sk">bear</div></div>
+        <div class="sc-box crash"><div class="sv">${crash>=0?'+':''}${(crash*100).toFixed(1)}&nbsp;%</div><div class="sk">crash-adj</div></div>
+      </div>
+    </div>`;
+  }
+  const GRP=[['equity','Equities','cls-eq','EQ'],['commodity','Commodities','cls-cmd','CMD'],['real_estate','Real Estate','cls-re','RE']];
+  const scenSect=GRP.filter(([g])=>groups[g]&&groups[g].length).map(([g,label,bc,bt])=>
+    `<div class="cb-section"><h5>${esc(label)} <span class="${bc}">${bt}</span></h5>${groups[g].map(scenRow).join('')}</div>`
+  ).join('');
+  const allSect=scenSect||`<div class="cb-section"><h5 style="color:var(--accent)">All tickers</h5>${Object.keys(cb.base_returns||{}).map(scenRow).join('')}</div>`;
+  const reasoning=cb.reasoning?`<details style="margin-top:12px"><summary>Full reasoning — IFTF Principles 2 (Signals) · 3 (Backcasting) · 4 (Two Curves)</summary><pre>${esc(cb.reasoning)}</pre></details>`:'';
+  return `<div class="card full cb-card">
+    <div class="chead">
+      <div class="ctitle" style="color:var(--accent)">
+        <span class="dot" style="background:var(--accent)"></span>Crystal Ball — Scenario Forecast
+      </div>
+      <span class="badge live a-live">xpyq eigendecomposition</span>
+    </div>
+    <div class="reason" style="color:var(--mut);margin-bottom:4px">
+      IFTF futures methodology · Principles 2 · 3 · 4 · Dominant factor variance ${fmt(cb.dominant_factor_var,4)}${cb.horizon_days?' · horizon '+cb.horizon_days+' d':''}
+    </div>
+    ${statBoxes}
+    ${bar}
+    <div class="lbl" style="margin-top:14px">scenario projections per ticker</div>
+    <div style="font-size:12px;color:var(--mut);margin-bottom:10px">Base: expected return compounded. Bull/Bear: base ± 1.5× annual vol (xpyq eigendecomposition). Crash-adj: base × ChaosEngine multiplier.</div>
+    ${allSect}
+    ${reasoning}
+  </div>`;
+}
+
 // ===================== chaos engine panel ===================================
 function chaosPanel(c){
   if(!c) return '';
@@ -582,7 +696,7 @@ function chaosPanel(c){
   const reasoning=c.reasoning?`<details style="margin-top:10px"><summary>Full reasoning &amp; feature signals</summary><pre>${esc(c.reasoning)}</pre></details>`:'';
   return `<div class="card full chaos">
     <div class="chead">
-      <div class="ctitle"><span class="dot" style="background:var(--bad)"></span>ChaosEngine — Event Probability Assessment</div>
+      <div class="ctitle"><span class="dot" style="background:var(--bad)"></span>Chaos Engine — Event Probability Assessment</div>
       <span class="badge" style="background:${col};border-color:${col};color:#06121f;font-weight:700">${esc(label)}</span>
     </div>
     <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px">
@@ -602,17 +716,21 @@ function render(d){
   const out=$('out');
   const qExtra=`<div class="lbl">QUBO penalty P</div><div class="reason">${fmt(d.proposals.quantum.penalty,4)}</div>`+heat(d.qubo);
   const mlExtra=mlFeatures(d.proposals.ml.features,d.proposals.ml.selected);
-  const chaosSect=d.chaos?`<div style="height:16px"></div>${chaosPanel(d.chaos)}`:''
+  const cbSect=d.crystal_ball?`<div style="height:16px"></div>${crystalBallPanel(d.crystal_ball,d.universe)}`:'';
+  const chaosSect=d.chaos?`<div style="height:16px"></div>${chaosPanel(d.chaos)}`:'';
+  const nEq=d.data.n_equities,nCmd=d.data.n_commodities,nRe=d.data.n_real_estate;
+  const assetBreak=nEq!=null?` (${nEq} eq${nCmd?' · '+nCmd+' cmd':''}${nRe?' · '+nRe+' re':''})`:'';
   out.innerHTML=
-    `<div class="reason" style="margin-bottom:14px;color:var(--mut)">
-       ${d.data.source} data &middot; ${d.data.rows} rows &middot; ${d.data.n_assets} assets
-       ${d.data.n_equities!=null?`(${d.data.n_equities} eq &middot; ${d.data.n_commodities} cmd)`:''} &middot;
-       ${d.data.rebalances} rebalances &middot; as of <b>${d.data.as_of}</b></div>
+    `<div style="color:var(--mut);font-size:13px;margin-bottom:16px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px">
+       ${esc(d.data.source)} data · <b style="color:var(--ink)">${d.data.n_assets} assets</b>${assetBreak}·
+       ${d.data.rows} rows · ${d.data.rebalances} rebalances · as of <b style="color:var(--ink)">${d.data.as_of}</b>
+     </div>
      <div class="cards">
        ${agentCard('q','QuantumAgent',d.proposals.quantum,qExtra)}
        ${agentCard('ml','MLAgent',d.proposals.ml,mlExtra)}
      </div>
      <div style="height:16px"></div>${metaPanel(d.meta)}
+     ${cbSect}
      ${chaosSect}
      <div style="height:16px"></div>${perfPanel(d.realized,d.history,d.summary)}
      <div style="height:16px"></div>${universePanel(d.universe)}`;

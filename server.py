@@ -541,6 +541,7 @@ def _run_pipeline(params: dict) -> dict:
     ml_rationale, ml_conf = _ml_rationale(ml_final)
 
     # ── Universe snapshot (final rebalance) ───────────────────────────────────
+    _ac = getattr(data, 'asset_classes', None) or {}
     universe = [
         {
             "ticker":     t,
@@ -549,9 +550,13 @@ def _run_pipeline(params: dict) -> dict:
             "in_quantum": t in quantum_final,
             "in_ml":      t in ml_final,
             "in_meta":    t in meta_final,
+            "asset_class": _ac[t].value if t in _ac else "equity",
         }
         for t in tickers
     ]
+    n_eq  = sum(1 for t in tickers if (t not in _ac or _ac[t].value == "equity"))
+    n_cmd = sum(1 for t in tickers if t in _ac and _ac[t].value == "commodity")
+    n_re  = sum(1 for t in tickers if t in _ac and _ac[t].value == "real_estate")
 
     # ── MetaAgent reasoning ───────────────────────────────────────────────────
     meta_reasoning = (
@@ -562,15 +567,42 @@ def _run_pipeline(params: dict) -> dict:
         f"wins with higher expected return. Over {len(history_rows)} rebalances, "
         f"QuantumAgent was chosen {quantum_wins}×, MLAgent {ml_wins}×."
     )
-
+    # ── Crystal Ball: scenario forecast ──────────────────────────────────────────
+    cb_pred = None
+    if params.get("use_crystal_ball", True):
+        try:
+            from forecast import CrystalBall, MomentumForecaster
+            from chaos import ChaosEngine
+            from contracts import NewsFeed
+            _as_of = dates[-1]
+            _news  = NewsFeed(as_of=pd.Timestamp(_as_of), articles=[])
+            _cb    = CrystalBall(MomentumForecaster(), ChaosEngine(api_key=XPYQ_KEY))
+            _pred  = _cb.predict(data, _news, _as_of)
+            cb_pred = {
+                "base_returns":           {t: round(v, 4) for t, v in _pred.base_returns.items()},
+                "bull_returns":           {t: round(v, 4) for t, v in _pred.bull_returns.items()},
+                "bear_returns":           {t: round(v, 4) for t, v in _pred.bear_returns.items()},
+                "crash_adjusted_returns": {t: round(v, 4) for t, v in _pred.crash_adjusted_returns.items()},
+                "annual_volatility":      {t: round(v, 4) for t, v in _pred.annual_volatility.items()},
+                "crash_probability":      round(_pred.crash_probability, 4),
+                "dominant_factor_var":    round(_pred.dominant_factor_var, 4),
+                "confidence":             {t: round(v, 4) for t, v in _pred.confidence.items()},
+                "horizon_days":           _pred.horizon_days,
+                "reasoning":              _pred.reasoning,
+            }
+        except Exception:
+            traceback.print_exc()
     # ── Assemble and return ───────────────────────────────────────────────────
     return {
         "data": {
-            "source":     src_type,
-            "rows":       len(dates),
-            "n_assets":   n_assets,
-            "rebalances": len(history_rows),
-            "as_of":      str(dates[-1].date()),
+            "source":        src_type,
+            "rows":          len(dates),
+            "n_assets":      n_assets,
+            "n_equities":    n_eq,
+            "n_commodities": n_cmd,
+            "n_real_estate": n_re,
+            "rebalances":    len(history_rows),
+            "as_of":         str(dates[-1].date()),
         },
         "proposals": {
             "quantum": {
@@ -620,7 +652,8 @@ def _run_pipeline(params: dict) -> dict:
             "shares":           {"quantum": quantum_share, "ml": ml_share},
             "cumulative_sharpe": round(meta_sharpe, 3),
         },
-        "universe": universe,
+        "universe":     universe,
+        "crystal_ball": cb_pred,
     }
 
 
