@@ -190,6 +190,19 @@
     border:1px solid var(--mut);color:var(--mut);font-size:10px;
     text-align:center;line-height:14px;cursor:help;margin-left:4px;vertical-align:middle}
 
+  /* chaos engine */
+  .card.chaos{border-color:#f87171;background:linear-gradient(180deg,#1a060622,var(--panel));margin-bottom:16px}
+  .chaos-bar-wrap{height:20px;border-radius:10px;background:var(--panel2);overflow:hidden;margin:8px 0 4px;position:relative}
+  .chaos-bar-fill{height:100%;border-radius:10px;}
+  .chaos-bar-wrap .chaos-marker{position:absolute;top:0;bottom:0;width:2px;background:#ffffff44}
+  .adj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin-top:6px}
+  .adj-box{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;text-align:center}
+  .adj-box .ak{font-size:11px;color:var(--mut);margin-bottom:2px}
+  .adj-box .av{font-size:16px;font-weight:800}
+  .adj-box.adj-short{border-color:var(--bad)}
+  .adj-box.adj-reduce{border-color:var(--meta)}
+  .adj-box.adj-hold{border-color:var(--good)}
+
   @media(max-width:1000px){
     .wrap{grid-template-columns:1fr}.side{position:static;height:auto}
     .cards,.meta-grid,.stat,.scenario-grid{grid-template-columns:1fr}}
@@ -288,6 +301,18 @@
     <div class="chk"><input type="checkbox"/><span>Force deterministic</span></div>
   </div>
 
+  <div class="grp" style="border-color:#f8717166">
+    <h4 style="color:#f87171">Chaos Engine</h4>
+    <div class="chk"><input type="checkbox" id="chaos_toggle" checked/><span>Enable event-probability assessment</span></div>
+    <label>Lookback <span class="val" id="chlbv">120</span> d</label>
+    <input id="chaos_lookback_s" type="range" min="30" max="252" value="120"/>
+    <label>Crash threshold <span class="val" id="chthv">−4.0</span>%</label>
+    <input id="chaos_thresh_s" type="range" min="-15" max="-1" step="0.5" value="-4"/>
+    <label>Crash horizon <span class="val" id="chhzv">5</span> d</label>
+    <input id="chaos_hz_s" type="range" min="1" max="20" value="5"/>
+    <div class="sub-tag" style="margin:6px 0 0">Bayesian crash-probability estimate fused with live news sentiment. Outputs per-ticker position multipliers.</div>
+  </div>
+
   <button class="run" id="run_btn">▶ Run pipeline</button>
 
   <div class="pills" style="margin-top:10px">
@@ -315,8 +340,8 @@
     <span class="arrow">→</span>
     <span class="node cb">Crystal Ball</span>
     <span class="arrow">→</span>
-    <span class="node">ChaosEngine</span>
-    <span class="arrow">→</span>
+    <span class="node" id="flow_chaos" style="border-color:#f87171;color:#f87171">ChaosEngine</span>
+    <span class="arrow" id="flow_chaos_arrow">→</span>
     <span class="node">score</span>
   </div>
 
@@ -913,6 +938,93 @@
     </div>
   </div><!-- /crystal ball -->
 
+  <!-- ===== ChaosEngine panel ===== -->
+  <div style="height:16px"></div>
+  <div class="card full chaos" id="chaos_panel">
+    <div class="chead">
+      <div class="ctitle" style="color:#f87171">
+        <span class="dot" style="background:#f87171"></span>ChaosEngine — Event Probability Assessment
+      </div>
+      <span class="badge live" style="background:#f59e0b;border-color:#f59e0b;color:#06121f">MODERATE — CAUTION</span>
+    </div>
+
+    <!-- headline metric -->
+    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px">
+      <span id="chaos_pct_label" style="font-size:36px;font-weight:800;color:#f59e0b">60.2 %</span>
+      <span style="color:var(--mut);font-size:13px">crash probability &middot; as of 2026-05-29</span>
+    </div>
+
+    <!-- probability bar -->
+    <div class="chaos-bar-wrap">
+      <div class="chaos-bar-fill" id="chaos_bar" style="width:60.2%;background:linear-gradient(90deg,var(--good),#f59e0b,var(--bad))"></div>
+      <div class="chaos-marker" style="left:40%" title="Moderate threshold (40%)"></div>
+      <div class="chaos-marker" style="left:65%" title="High threshold (65%)"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-bottom:8px">
+      <span>0 %</span><span style="color:#f59e0b">▲ 40 % moderate</span><span style="color:var(--bad)">▲ 65 % high</span><span>100 %</span>
+    </div>
+
+    <!-- top-level stats -->
+    <div class="stat" style="margin:12px 0">
+      <div class="box">
+        <div class="v" style="color:#f59e0b">60.2 %</div>
+        <div class="k">crash probability</div>
+      </div>
+      <div class="box">
+        <div class="v" style="color:#f59e0b">CAUTION</div>
+        <div class="k">risk regime</div>
+      </div>
+      <div class="box">
+        <div class="v" style="color:var(--mut)">+0.12</div>
+        <div class="k">news sentiment (mean)</div>
+      </div>
+    </div>
+
+    <!-- per-ticker multipliers -->
+    <div class="lbl">Per-ticker position multipliers</div>
+    <div style="font-size:12px;color:var(--mut);margin-bottom:6px">
+      Applied to portfolio weights before execution. Values below 1 reduce exposure; negative values signal short.
+    </div>
+    <div class="adj-grid" id="adj_grid">
+      <!-- populated by JS -->
+    </div>
+
+    <!-- feature signals used -->
+    <details style="margin-top:14px">
+      <summary style="cursor:pointer;color:var(--mut);font-size:12px">Feature signals used by Chaos Engine</summary>
+      <div class="sigs" style="margin-top:10px">
+        <div class="sig"><div class="k">lookback</div><div class="v">120 d</div></div>
+        <div class="sig"><div class="k">crash threshold</div><div class="v">−4.0 %</div></div>
+        <div class="sig"><div class="k">crash horizon</div><div class="v">5 d</div></div>
+        <div class="sig"><div class="k">realised crash windows</div><div class="v">4 / 110</div></div>
+        <div class="sig"><div class="k">xpyq eigen path</div><div class="v">active</div></div>
+        <div class="sig"><div class="k">news articles ingested</div><div class="v">14</div></div>
+        <div class="sig"><div class="k">mean news sentiment</div><div class="v">+0.12</div></div>
+        <div class="sig"><div class="k">portfolio vol (20d)</div><div class="v">18.4 %</div></div>
+        <div class="sig"><div class="k">corr momentum 20d</div><div class="v">+0.38</div></div>
+        <div class="sig"><div class="k">VIX-proxy</div><div class="v">22.1</div></div>
+      </div>
+      <pre style="margin-top:10px">ChaosEngine evaluation @ 2026-05-29
+
+Feature vector:
+  vol_20d            = 0.1837
+  momentum_20d       = 0.0421
+  corr_momentum_20d  = 0.3812
+  vix_proxy          = 0.2213
+  news_sentiment     = 0.1201
+
+xpyq eigen-classification:
+  Crash cluster centroid (normalised) : [0.71, 0.18, 0.52, 0.63, 0.31]
+  Normal cluster centroid (normalised): [0.28, 0.61, 0.41, 0.22, 0.68]
+  Current feature (normalised)        : [0.54, 0.38, 0.61, 0.48, 0.44]
+  dist_crash   = 0.3140
+  dist_normal  = 0.4721
+  P(crash)     = dist_normal / (dist_crash + dist_normal) = 0.6004
+
+Risk regime: CAUTION (0.40 ≤ P &lt; 0.65)</pre>
+    </details>
+  </div>
+
   <!-- ===== Performance ===== -->
   <div style="height:16px"></div>
   <div class="card full" id="perf_card">
@@ -962,6 +1074,48 @@ bind('lb','lbv');
 bind('hp','hpv');
 bind('vs','vsv',v=>Number(v).toFixed(1));
 bind('dd','ddv');
+bind('chaos_lookback_s','chlbv');
+bind('chaos_thresh_s','chthv',v=>Number(v).toFixed(1));
+bind('chaos_hz_s','chhzv');
+
+// ─── chaos toggle ─────────────────────────────────────────────────────────────
+const CHAOS_ADJ={
+  NVDA:{v:0.40,cls:'adj-reduce',label:'REDUCE'},
+  GOOG:{v:0.40,cls:'adj-reduce',label:'REDUCE'},
+  GOLD:{v:0.40,cls:'adj-reduce',label:'REDUCE'},
+  SILVER:{v:-0.10,cls:'adj-short',label:'SHORT'},
+  PLATINUM:{v:0.40,cls:'adj-reduce',label:'REDUCE'},
+  PALLADIUM:{v:0.34,cls:'adj-reduce',label:'REDUCE'},
+  OIL:{v:-0.05,cls:'adj-short',label:'SHORT'},
+  HOUSING:{v:0.40,cls:'adj-reduce',label:'REDUCE'},
+  HOMEBUILDERS:{v:0.30,cls:'adj-reduce',label:'REDUCE'},
+  MORTGAGES:{v:0.28,cls:'adj-reduce',label:'REDUCE'},
+  COMMERCIAL_RE:{v:0.40,cls:'adj-reduce',label:'REDUCE'},
+  RESIDENTIAL:{v:0.38,cls:'adj-reduce',label:'REDUCE'},
+};
+function renderAdjGrid(){
+  document.getElementById('adj_grid').innerHTML=Object.entries(CHAOS_ADJ).map(([t,a])=>{
+    const col=a.cls==='adj-short'?'var(--bad)':a.cls==='adj-reduce'?'#f59e0b':'var(--good)';
+    const sign=a.v>=0?'+':'';
+    return `<div class="adj-box ${a.cls}">
+      <div class="ak">${t}</div>
+      <div class="av" style="color:${col}">${sign}${a.v.toFixed(2)}×</div>
+      <div class="ak">${a.label}</div>
+    </div>`;
+  }).join('');
+}
+renderAdjGrid();
+
+function syncChaosPanel(){
+  const on=document.getElementById('chaos_toggle').checked;
+  const panel=document.getElementById('chaos_panel');
+  const fn=document.getElementById('flow_chaos');
+  const fa=document.getElementById('flow_chaos_arrow');
+  panel.style.display=on?'':'none';
+  if(fn){ fn.style.display=on?'':'none'; fa.style.display=on?'':'none'; }
+}
+document.getElementById('chaos_toggle').addEventListener('change',syncChaosPanel);
+syncChaosPanel();
 
 // ─── ticker buttons ──────────────────────────────────────────────────────────
 const EQUITIES=["NVDA","GOOG","AAPL","MSFT","AMZN","META","TSLA","AMD","NFLX","INTC"];

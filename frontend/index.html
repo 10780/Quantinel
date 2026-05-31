@@ -131,6 +131,18 @@
   .cdist .crow{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--mut)}
   .cdist .cbar{flex:1}
   .mono{font-family:ui-monospace,Menlo,monospace}
+  /* ---- chaos engine ---- */
+  .card.chaos{border-color:#f87171;background:linear-gradient(180deg,#1a060622,var(--panel));margin-bottom:16px}
+  .chaos-bar-wrap{height:20px;border-radius:10px;background:var(--panel2);overflow:hidden;margin:8px 0 4px;position:relative}
+  .chaos-bar-fill{height:100%;border-radius:10px;transition:width .5s ease}
+  .chaos-bar-wrap .chaos-marker{position:absolute;top:0;bottom:0;width:2px;background:#ffffff44}
+  .adj-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;margin-top:6px}
+  .adj-box{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;text-align:center}
+  .adj-box .ak{font-size:11px;color:var(--mut);margin-bottom:2px}
+  .adj-box .av{font-size:16px;font-weight:800}
+  .adj-box.adj-short{border-color:var(--bad)}
+  .adj-box.adj-reduce{border-color:var(--meta)}
+  .adj-box.adj-hold{border-color:var(--good)}
   @media(max-width:1000px){.wrap{grid-template-columns:1fr}.side{position:static;height:auto}
     .cards,.meta-grid,.stat{grid-template-columns:1fr}}
 </style>
@@ -206,6 +218,18 @@
       <div class="tag" style="margin:6px 0 0">Falls back: Claude → OpenRouter → Sharpe rule</div>
     </div>
 
+    <div class="grp" style="border-color:#f8717166">
+      <h4 style="color:#f87171">Chaos Engine</h4>
+      <div class="chk"><input id="use_chaos" type="checkbox" checked/><span>Enable event-probability assessment</span></div>
+      <label>Lookback <span class="val" id="chlbv">120</span> d</label>
+      <input id="chaos_lookback" type="range" min="30" max="252" value="120"/>
+      <label>Crash threshold <span class="val" id="chthv">−4.0</span>%</label>
+      <input id="chaos_threshold" type="range" min="-15" max="-1" step="0.5" value="-4"/>
+      <label>Crash horizon <span class="val" id="chhzv">5</span> d</label>
+      <input id="chaos_horizon" type="range" min="1" max="20" value="5"/>
+      <div class="tag" style="margin:6px 0 0">Bayesian crash-probability estimate fused with live news sentiment. Outputs per-ticker position multipliers.</div>
+    </div>
+
     <button class="run" id="run">▶ Run pipeline</button>
     <div class="pills" id="health"></div>
   </aside>
@@ -220,7 +244,10 @@
       <span class="node m" id="f_m">MLAgent</span>
       <span class="arrow">→</span>
       <span class="node x" id="f_x">MetaAgent</span>
-      <span class="arrow">→</span><span class="node">score</span>
+      <span class="arrow">→</span>
+      <span class="node" id="f_chaos" style="border-color:#f87171;color:#f87171;display:none">ChaosEngine</span>
+      <span class="arrow" id="f_chaos_arrow" style="display:none">→</span>
+      <span class="node">score</span>
     </div>
 
     <!-- ===== Quantum Hardware Lab ===== -->
@@ -292,6 +319,17 @@ bind('holding','hpv');
 bind('poll_timeout','ptv');
 bind('queue_round','qrv');
 bind('shots','shv');
+bind('chaos_lookback','chlbv');
+bind('chaos_threshold','chthv',v=>Number(v).toFixed(1));
+bind('chaos_horizon','chhzv');
+// show/hide chaos flow node
+function syncChaosFlow(){
+  const on=$('use_chaos').checked;
+  $('f_chaos').style.display=on?'':'none';
+  $('f_chaos_arrow').style.display=on?'':'none';
+}
+$('use_chaos').addEventListener('change',syncChaosFlow);
+syncChaosFlow();
 $('queue_round').addEventListener('input',()=>$('qr_lbl').textContent=$('queue_round').value);
 $('qr_lbl').textContent=$('queue_round').value;
 
@@ -342,6 +380,10 @@ function collectParams(){
     poll_timeout:+$('poll_timeout').value, use_claude:$('use_claude').checked,
     meta_mode:$('meta_det').checked?'deterministic':'auto',
     shots:+$('shots').value, ibm_backend:$('ibm_device').value||null,
+    use_chaos:$('use_chaos').checked,
+    chaos_lookback:+$('chaos_lookback').value,
+    chaos_threshold:+$('chaos_threshold').value/100,
+    chaos_horizon:+$('chaos_horizon').value,
   };
 }
 
@@ -486,10 +528,57 @@ function universePanel(u){
       <tbody>${rows}</tbody></table></div>`;
 }
 
+// ===================== chaos engine panel ===================================
+function chaosPanel(c){
+  if(!c) return '';
+  const p=c.crash_probability;
+  const pct100=(p*100).toFixed(1);
+  const col=p>=0.65?'var(--bad)':p>=0.40?'#f59e0b':'var(--good)';
+  const label=p>=0.65?'HIGH — CRASH ALERT':p>=0.40?'MODERATE — CAUTION':'LOW — NORMAL';
+  // probability bar with threshold markers
+  const bar=`<div class="chaos-bar-wrap">
+    <div class="chaos-bar-fill" style="width:${pct100}%;background:linear-gradient(90deg,var(--good),#f59e0b,var(--bad))"></div>
+    <div class="chaos-marker" style="left:40%" title="Moderate threshold (40%)"></div>
+    <div class="chaos-marker" style="left:65%" title="High threshold (65%)"></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-bottom:8px">
+    <span>0 %</span><span style="color:#f59e0b">▲ 40 %</span><span style="color:var(--bad)">▲ 65 %</span><span>100 %</span>
+  </div>`;
+  // per-ticker weight multipliers
+  const adjBoxes=Object.entries(c.ticker_adjustments||{}).map(([t,v])=>{
+    const isSh=v<0; const isRed=v>=0&&v<1;
+    const cls=isSh?'adj-short':isRed?'adj-reduce':'adj-hold';
+    const valColor=isSh?'var(--bad)':isRed?'#f59e0b':'var(--good)';
+    const action=isSh?'SHORT':isRed?'REDUCE':'HOLD';
+    return `<div class="adj-box ${cls}">
+      <div class="ak">${esc(t)}</div>
+      <div class="av" style="color:${valColor}">${v>=0?'+':''}${fmt(v,2)}×</div>
+      <div class="ak">${action}</div>
+    </div>`;
+  }).join('');
+  const reasoning=c.reasoning?`<details style="margin-top:10px"><summary>Full reasoning &amp; feature signals</summary><pre>${esc(c.reasoning)}</pre></details>`:'';
+  return `<div class="card full chaos">
+    <div class="chead">
+      <div class="ctitle"><span class="dot" style="background:var(--bad)"></span>ChaosEngine — Event Probability Assessment</div>
+      <span class="badge" style="background:${col};border-color:${col};color:#06121f;font-weight:700">${esc(label)}</span>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px">
+      <span style="font-size:36px;font-weight:800;color:${col}">${pct100} %</span>
+      <span style="color:var(--mut);font-size:13px">crash probability · as of ${esc(c.as_of||'—')}</span>
+    </div>
+    ${bar}
+    <div class="lbl">per-ticker position multipliers</div>
+    <div style="font-size:12px;color:var(--mut);margin-bottom:6px">Applied to portfolio weights. Values below 1 reduce exposure; negative values signal short.</div>
+    <div class="adj-grid">${adjBoxes}</div>
+    ${reasoning}
+  </div>`;
+}
+
 function render(d){
   const out=$('out');
   const qExtra=`<div class="lbl">QUBO penalty P</div><div class="reason">${fmt(d.proposals.quantum.penalty,4)}</div>`+heat(d.qubo);
   const mlExtra=mlFeatures(d.proposals.ml.features,d.proposals.ml.selected);
+  const chaosSect=d.chaos?`<div style="height:16px"></div>${chaosPanel(d.chaos)}`:''
   out.innerHTML=
     `<div class="reason" style="margin-bottom:14px;color:var(--mut)">
        ${d.data.source} data &middot; ${d.data.rows} rows &middot; ${d.data.n_assets} assets
@@ -500,6 +589,7 @@ function render(d){
        ${agentCard('ml','MLAgent',d.proposals.ml,mlExtra)}
      </div>
      <div style="height:16px"></div>${metaPanel(d.meta)}
+     ${chaosSect}
      <div style="height:16px"></div>${perfPanel(d.realized,d.history,d.summary)}
      <div style="height:16px"></div>${universePanel(d.universe)}`;
 }
