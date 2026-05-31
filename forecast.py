@@ -15,7 +15,7 @@ import time
 import numpy as np
 import pandas as pd
 
-from contracts import CrystalBallPrediction, Forecast, MarketData, NewsFeed
+from contracts import AssetClass, CrystalBallPrediction, Forecast, MarketData, NewsFeed
 
 _XPYQ_BASE = "https://xpyq-lib-production.up.railway.app"
 
@@ -410,41 +410,61 @@ print(json.dumps({{
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _detect_signals(rets: pd.DataFrame, tickers: list[str]) -> dict[str, list[str]]:
+    def _detect_signals(
+        rets: pd.DataFrame,
+        tickers: list[str],
+        asset_classes: dict[str, AssetClass] | None = None,
+    ) -> dict[str, list[str]]:
         """
         IFTF Principle 2 — Focus on signals.
 
-        Scan each ticker for anomalous deviations from its own baseline —
-        marginal developments that may indicate an emerging discontinuity.
-        These are not predictions; they are signals that warrant attention.
+        Scan each ticker for anomalous deviations from its own baseline.
+        Thresholds are calibrated per asset class:
 
-        Signals detected
-        ----------------
-        - Volatility surge   : 5d vol > 1.8× the 60d vol baseline.
-        - Momentum break     : long trend positive but short momentum turning negative.
-        - Counter-trend bounce: long trend negative but short momentum turning positive.
-        - Drawdown warning   : price has fallen > 8 % from its 60d peak.
+        - EQUITY      : vol surge 1.8×, drawdown −8 %, momentum bands ±1 %/±2 %
+        - COMMODITY   : vol surge 2.2×, drawdown −12 %, momentum bands ±2 %/±4 %
+          (commodities carry naturally higher baseline vol, so standard equity
+           thresholds would produce constant false positives)
+        - REAL_ESTATE : vol surge 1.7×, drawdown −7 %, momentum bands ±1 %/±2 %
+          (REIT ETFs can be more rate-sensitive; lower drawdown threshold)
         """
+        if asset_classes is None:
+            asset_classes = {}
+
+        # (vol_surge_ratio, drawdown_floor, mom_short_neg, mom_long_pos,
+        #  mom_short_pos, mom_long_neg)
+        _THR: dict[str, tuple] = {
+            "equity":      (1.8, -0.08, -0.01,  0.02,  0.01, -0.02),
+            "commodity":   (2.2, -0.12, -0.02,  0.04,  0.02, -0.04),
+            "real_estate": (1.7, -0.07, -0.01,  0.02,  0.01, -0.02),
+        }
+
         signals: dict[str, list[str]] = {t: [] for t in tickers}
         for t in tickers:
             r = rets[t].dropna()
             if len(r) < 20:
                 continue
 
+            cls = asset_classes.get(t, AssetClass.EQUITY).value
+            vol_thr, dd_thr, ms_neg, ml_pos, ms_pos, ml_neg = _THR.get(
+                cls, _THR["equity"]
+            )
+
             vol_5  = float(r.tail(5).std())
             vol_60 = float(r.tail(min(60, len(r))).std())
-            if vol_60 > 0 and vol_5 / vol_60 > 1.8:
+            if vol_60 > 0 and vol_5 / vol_60 > vol_thr:
                 signals[t].append(
-                    f"volatility surge (5d/60d vol ratio {vol_5 / vol_60:.1f}×)"
+                    f"volatility surge (5d/60d vol ratio {vol_5 / vol_60:.1f}×,"
+                    f" threshold {vol_thr:.1f}× for {cls})"
                 )
 
             mom_10 = float(r.tail(10).sum())
             mom_60 = float(r.tail(min(60, len(r))).sum())
-            if mom_10 < -0.01 and mom_60 > 0.02:
+            if mom_10 < ms_neg and mom_60 > ml_pos:
                 signals[t].append(
                     "momentum break (established uptrend losing short-term traction)"
                 )
-            elif mom_10 > 0.01 and mom_60 < -0.02:
+            elif mom_10 > ms_pos and mom_60 < ml_neg:
                 signals[t].append(
                     "counter-trend bounce (short-term recovery within a longer downtrend)"
                 )
@@ -452,9 +472,11 @@ print(json.dumps({{
             prices  = (1 + r).cumprod()
             peak_60 = float(prices.tail(min(60, len(prices))).max())
             current = float(prices.iloc[-1])
-            if peak_60 > 0 and (current / peak_60 - 1.0) < -0.08:
+            dd_pct  = current / peak_60 - 1.0
+            if peak_60 > 0 and dd_pct < dd_thr:
                 signals[t].append(
-                    f"drawdown warning ({current / peak_60 - 1.0:+.1%} from 60d peak)"
+                    f"drawdown warning ({dd_pct:+.1%} from 60d peak,"
+                    f" threshold {dd_thr:.0%} for {cls})"
                 )
 
         return signals
@@ -464,89 +486,116 @@ print(json.dumps({{
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _backcast_regimes(rets: pd.DataFrame, tickers: list[str]) -> dict:
+    def _backcast_regimes(
+        rets: pd.DataFrame,
+        tickers: list[str],
+        asset_classes: dict[str, AssetClass] | None = None,
+    ) -> dict:
         """
         IFTF Principle 3 — Look back to see forward.
 
-        Uses backcasting (not forecasting): locate historical windows whose
-        volatility regime resembles the current one and report what typically
-        followed.  The future seldom replicates past events but frequently
-        mirrors the *patterns* influencing its progression.
+        Locates historical windows whose volatility regime resembles the
+        current one and reports what typically followed.
 
-        Returns a dict with:
-            analog_count        : number of matching historical windows
-            median_fwd_return   : median portfolio return over the next 10 days
-                                  across all analogous windows
-            pct_positive        : fraction of analogous windows where fwd return > 0
-            regime_label        : qualitative description of the current regime
+        When ``asset_classes`` is provided the backcast is computed
+        separately for each asset class present in the universe (equities,
+        commodities, real estate).  This avoids conflating very different
+        vol regimes in a mixed portfolio.  Without class information a
+        single equal-weight portfolio backcast is returned under the key
+        ``"portfolio"``.
+
+        Returns ``dict[class_label, backcast_dict]`` where each inner dict
+        contains: ``analog_count``, ``median_fwd_return``, ``pct_positive``,
+        ``regime_label``.
         """
-        port = rets.mean(axis=1).dropna()
-        if len(port) < 40:
+
+        def _backcast_series(port: pd.Series) -> dict:
+            if len(port) < 40:
+                return {
+                    "analog_count": 0,
+                    "median_fwd_return": None,
+                    "pct_positive": None,
+                    "regime_label": "insufficient history for backcasting",
+                }
+            window = 10
+            current_vol = float(port.tail(window).std())
+            analog_fwd: list[float] = []
+            for i in range(len(port) - window * 2):
+                hist_vol = float(port.iloc[i : i + window].std())
+                if current_vol > 0 and abs(hist_vol - current_vol) / current_vol < 0.25:
+                    fwd = port.iloc[i + window : i + window * 2]
+                    analog_fwd.append(float((1 + fwd).prod() - 1))
+            if not analog_fwd:
+                return {
+                    "analog_count": 0,
+                    "median_fwd_return": None,
+                    "pct_positive": None,
+                    "regime_label": "no analogous historical regimes found",
+                }
+            arr = np.array(analog_fwd)
+            overall_vol = float(port.std())
             return {
-                "analog_count": 0,
-                "median_fwd_return": None,
-                "pct_positive": None,
-                "regime_label": "insufficient history for backcasting",
+                "analog_count": len(arr),
+                "median_fwd_return": float(np.median(arr)),
+                "pct_positive": float((arr > 0).mean()),
+                "regime_label": (
+                    "elevated stress"
+                    if current_vol > overall_vol * 1.5
+                    else "typical volatility"
+                ),
             }
 
-        window = 10
-        current_vol = float(port.tail(window).std())
+        if not asset_classes:
+            port = rets[tickers].mean(axis=1).dropna()
+            return {"portfolio": _backcast_series(port)}
 
-        analog_fwd: list[float] = []
-        for i in range(len(port) - window * 2):
-            hist_vol = float(port.iloc[i: i + window].std())
-            if current_vol > 0 and abs(hist_vol - current_vol) / current_vol < 0.25:
-                fwd = port.iloc[i + window: i + window * 2]
-                analog_fwd.append(float((1 + fwd).prod() - 1))
+        # Group tickers by asset class and backcast each group independently
+        groups: dict[str, list[str]] = {}
+        for t in tickers:
+            cls = asset_classes.get(t, AssetClass.EQUITY).value
+            groups.setdefault(cls, []).append(t)
 
-        if not analog_fwd:
-            return {
-                "analog_count": 0,
-                "median_fwd_return": None,
-                "pct_positive": None,
-                "regime_label": "no analogous historical regimes found",
-            }
+        result: dict[str, dict] = {}
+        for cls_label, cls_tickers in groups.items():
+            available = [t for t in cls_tickers if t in rets.columns]
+            if not available:
+                continue
+            port = rets[available].mean(axis=1).dropna()
+            result[cls_label] = _backcast_series(port)
 
-        arr = np.array(analog_fwd)
-        overall_vol = float(port.std())
-        regime_label = (
-            "elevated stress"
-            if current_vol > overall_vol * 1.5
-            else "typical volatility"
-        )
-        return {
-            "analog_count": len(arr),
-            "median_fwd_return": float(np.median(arr)),
-            "pct_positive": float((arr > 0).mean()),
-            "regime_label": regime_label,
-        }
+        return result
 
     # ------------------------------------------------------------------
     # Futures Thinking Principle 4: Uncover patterns (Two Curves)
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _two_curves_classify(rets: pd.DataFrame, tickers: list[str]) -> dict[str, str]:
+    def _two_curves_classify(
+        rets: pd.DataFrame,
+        tickers: list[str],
+        asset_classes: dict[str, AssetClass] | None = None,
+    ) -> dict[str, str]:
         """
         IFTF Principle 4 — Uncover patterns: Two Curves framework.
 
-        During transformative periods two distinct curves coexist:
-          First curve  — the long-running established trend (understood rules,
-                         declining trajectory, uncertain obsolescence date).
-          Second curve — the nascent ascending pattern (only initial signals
-                         visible, much left to imagination).
+        Classification per ticker using per-asset-class momentum thresholds:
 
-        Classification per ticker
-        -------------------------
-        first_curve_ascending  : established uptrend intact in both short & long windows.
-        first_curve_peak       : long trend positive but short momentum reversing — the
-                                 first curve may be reaching its inflection point.
-        first_curve_declining  : established downtrend intact in both short & long windows.
-        second_curve_emerging  : long trend negative but short momentum turning positive —
-                                 a nascent second curve may be forming.
-        transition             : mixed / flat signals; curve boundary unclear.
-        indeterminate          : insufficient history.
+        - EQUITY      : long ±3 % / ±1 %, short ±1 %
+        - COMMODITY   : long ±5 % / ±2 %, short ±2 %
+          (wider bands to avoid classifying ordinary commodity noise as a
+           curve transition)
+        - REAL_ESTATE : long ±3 % / ±1 %, short ±1 %  (similar to equity)
         """
+        if asset_classes is None:
+            asset_classes = {}
+
+        # (long_strong_pos, long_weak_pos, short_weak_pos)  — negatives are mirrors
+        _THR: dict[str, tuple] = {
+            "equity":      (0.03, 0.01, 0.01),
+            "commodity":   (0.05, 0.02, 0.02),
+            "real_estate": (0.03, 0.01, 0.01),
+        }
+
         result: dict[str, str] = {}
         for t in tickers:
             r = rets[t].dropna()
@@ -554,16 +603,19 @@ print(json.dumps({{
                 result[t] = "indeterminate"
                 continue
 
+            cls = asset_classes.get(t, AssetClass.EQUITY).value
+            l_strong, l_weak, s_weak = _THR.get(cls, _THR["equity"])
+
             mom_long  = float(r.tail(min(60, len(r))).sum())
             mom_short = float(r.tail(10).sum())
 
-            if mom_long > 0.03 and mom_short < -0.01:
+            if mom_long > l_strong and mom_short < -s_weak:
                 result[t] = "first_curve_peak"
-            elif mom_long < -0.03 and mom_short > 0.01:
+            elif mom_long < -l_strong and mom_short > s_weak:
                 result[t] = "second_curve_emerging"
-            elif mom_long > 0.01 and mom_short > 0.01:
+            elif mom_long > l_weak and mom_short > s_weak:
                 result[t] = "first_curve_ascending"
-            elif mom_long < -0.01 and mom_short < -0.01:
+            elif mom_long < -l_weak and mom_short < -s_weak:
                 result[t] = "first_curve_declining"
             else:
                 result[t] = "transition"
@@ -598,6 +650,7 @@ print(json.dumps({{
         backcast: dict,
         two_curves: dict[str, str],
         horizon: int | None = None,
+        asset_classes: dict[str, AssetClass] | None = None,
     ) -> str:
         horizon = horizon if horizon is not None else self.horizon_days
         horizon_label = (
@@ -610,6 +663,23 @@ print(json.dumps({{
             else "NORMAL"
         )
 
+        # Build asset-class groupings for display
+        _CLASS_HEADER = {
+            "equity":      "EQUITIES",
+            "commodity":   "COMMODITIES",
+            "real_estate": "REAL ESTATE",
+            "portfolio":   "PORTFOLIO",
+        }
+        if asset_classes:
+            groups: dict[str, list[str]] = {}
+            for t in tickers:
+                cls = asset_classes.get(t, AssetClass.EQUITY).value
+                groups.setdefault(cls, []).append(t)
+        else:
+            groups = {"equity": list(tickers)}
+
+        multi_class = len(groups) > 1
+
         lines = [
             f"CrystalBall [{pd.Timestamp(as_of).date()}] — {horizon_label} OUTLOOK"
             f" ({horizon} trading days)",
@@ -620,11 +690,16 @@ print(json.dumps({{
             "   not predictions. Future data does not exist; only signals do.)",
         ]
         any_signal = False
-        for t in tickers:
-            sigs = signals.get(t, [])
-            if sigs:
-                any_signal = True
-                lines.append(f"  {t:6s}: " + " | ".join(sigs))
+        for cls_label, cls_tickers in groups.items():
+            if multi_class:
+                lines.append(f"  [{_CLASS_HEADER.get(cls_label, cls_label)}]")
+            for t in cls_tickers:
+                sigs = signals.get(t, [])
+                if sigs:
+                    any_signal = True
+                    lines.append(f"    {t:8s}: " + " | ".join(sigs))
+                elif multi_class:
+                    lines.append(f"    {t:8s}: no anomalous signals")
         if not any_signal:
             lines.append(
                 "  No anomalous signals detected — market in baseline continuity."
@@ -635,16 +710,22 @@ print(json.dumps({{
             "── PRINCIPLE 3: LOOK BACK TO SEE FORWARD (BACKCASTING) ──────────────",
             "  (Historical analogues reveal recurrent patterns, not repetitions.)",
         ]
-        if backcast.get("analog_count", 0) > 0:
-            lines += [
-                f"  Analogous historical regimes : {backcast['analog_count']}",
-                f"  Median forward return        : {backcast['median_fwd_return']:+.2%}"
-                f"  (next 10 days across all analogues)",
-                f"  Historically positive        : {backcast['pct_positive']:.0%} of analogues",
-                f"  Current regime pattern       : {backcast['regime_label']}",
-            ]
-        else:
-            lines.append(f"  {backcast.get('regime_label', 'Backcasting unavailable.')}")
+        for cls_label, bc in backcast.items():
+            hdr = _CLASS_HEADER.get(cls_label, cls_label)
+            if len(backcast) > 1:
+                lines.append(f"  [{hdr}]")
+            if bc.get("analog_count", 0) > 0:
+                lines += [
+                    f"    Analogous historical regimes : {bc['analog_count']}",
+                    f"    Median forward return        : {bc['median_fwd_return']:+.2%}"
+                    f"  (next 10 days across all analogues)",
+                    f"    Historically positive        : {bc['pct_positive']:.0%} of analogues",
+                    f"    Current regime pattern       : {bc['regime_label']}",
+                ]
+            else:
+                lines.append(
+                    f"    {bc.get('regime_label', 'Backcasting unavailable.')}"
+                )
 
         lines += [
             "",
@@ -653,11 +734,14 @@ print(json.dumps({{
             "   The inflection between them is where futures thinking adds most value.)",
             f"  Dominant market factor variance (annualised): {dominant_factor_var:.4f}",
         ]
-        for t in tickers:
-            curve = two_curves.get(t, "indeterminate")
-            lines.append(
-                f"  {t:6s}: {self._CURVE_LABELS.get(curve, curve)}"
-            )
+        for cls_label, cls_tickers in groups.items():
+            if multi_class:
+                lines.append(f"  [{_CLASS_HEADER.get(cls_label, cls_label)}]")
+            for t in cls_tickers:
+                curve = two_curves.get(t, "indeterminate")
+                lines.append(
+                    f"    {t:8s}: {self._CURVE_LABELS.get(curve, curve)}"
+                )
 
         lines += [
             "",
@@ -665,14 +749,17 @@ print(json.dumps({{
             f"  Risk regime      : {level}",
             f"  Crash probability: {chaos_signal.crash_probability:.3f}",
         ]
-        for t in tickers:
-            lines.append(
-                f"  {t:6s}  base: {base_returns[t]:+.1%}  "
-                f"bull: {bull_returns[t]:+.1%}  "
-                f"bear: {bear_returns[t]:+.1%}  "
-                f"vol: {annual_vol[t]:.1%}  "
-                f"crash-adj: {crash_adjusted_returns[t]:+.1%}"
-            )
+        for cls_label, cls_tickers in groups.items():
+            if multi_class:
+                lines.append(f"  [{_CLASS_HEADER.get(cls_label, cls_label)}]")
+            for t in cls_tickers:
+                lines.append(
+                    f"    {t:8s}  base: {base_returns[t]:+.1%}  "
+                    f"bull: {bull_returns[t]:+.1%}  "
+                    f"bear: {bear_returns[t]:+.1%}  "
+                    f"vol: {annual_vol[t]:.1%}  "
+                    f"crash-adj: {crash_adjusted_returns[t]:+.1%}"
+                )
         return "\n".join(lines)
 
     # ------------------------------------------------------------------
@@ -732,15 +819,17 @@ print(json.dumps({{
         confidence = {t: short_forecast.confidence.get(t, 0.0) for t in tickers}
 
         # 6. Futures Thinking enrichment (Principles 2, 3, 4)
-        signals    = self._detect_signals(rets, tickers)
-        backcast   = self._backcast_regimes(rets, tickers)
-        two_curves = self._two_curves_classify(rets, tickers)
+        asset_cls = data.asset_classes if data.asset_classes else None
+        signals    = self._detect_signals(rets, tickers, asset_cls)
+        backcast   = self._backcast_regimes(rets, tickers, asset_cls)
+        two_curves = self._two_curves_classify(rets, tickers, asset_cls)
 
         reasoning = self._build_reasoning(
             as_of, tickers, base_returns, bull_returns, bear_returns,
             crash_adjusted_returns, annual_vol, chaos_signal, dominant_factor_var,
             signals, backcast, two_curves,
             horizon=horizon,
+            asset_classes=asset_cls,
         )
 
         return CrystalBallPrediction(

@@ -28,6 +28,7 @@ class AssetClass(str, Enum):
 
     EQUITY = "equity"
     COMMODITY = "commodity"
+    REAL_ESTATE = "real_estate"
 
 
 # ============================================================================

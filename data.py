@@ -520,49 +520,227 @@ class MockCommodityDataSource:
 
 
 class CombinedDataSource:
-    """Merges an equity data source and a commodity data source into one ``MarketData``.
+    """Merges two or more asset-class data sources into one ``MarketData``.
 
     All downstream layers (Forecast, Risk, Optimizer) are ticker-agnostic and
     work unchanged on the combined universe.  The ``asset_classes`` field on the
     returned ``MarketData`` lets any layer filter by asset type when needed.
 
+    Accepts any number of positional source arguments, each with a
+    ``load() -> MarketData`` method.  Bars are aligned to the intersection of
+    business days across all sources.
+
     Parameters
     ----------
-    equity_source : DataSource
-        Any source with a ``load() -> MarketData`` method (e.g. ``MockDataSource``,
-        ``YFinanceDataSource``).
-    commodity_source : DataSource
-        Any source with a ``load() -> MarketData`` method (e.g.
-        ``MockCommodityDataSource``, ``CommodityDataSource``).
+    *sources : DataSource
+        Two or more data sources.  Examples::
+
+            CombinedDataSource(MockDataSource(), MockCommodityDataSource())
+            CombinedDataSource(MockDataSource(), MockCommodityDataSource(),
+                               MockHousingDataSource())
     """
 
-    def __init__(self, equity_source, commodity_source) -> None:
-        self.equity_source = equity_source
-        self.commodity_source = commodity_source
+    def __init__(self, *sources) -> None:
+        if len(sources) < 2:
+            raise ValueError("CombinedDataSource requires at least two sources.")
+        self.sources = sources
 
     def load(self) -> MarketData:
-        """Load both sources and merge into a single ``MarketData`` contract."""
-        eq = self.equity_source.load()
-        co = self.commodity_source.load()
+        """Load all sources and merge into a single ``MarketData`` contract."""
+        loaded = [s.load() for s in self.sources]
 
-        # Align date indices: take the intersection of business days
-        eq_idx = eq.close_prices().index
-        co_idx = co.close_prices().index
-        common = eq_idx.intersection(co_idx)
+        # Align date indices: intersection across all sources
+        common = loaded[0].close_prices().index
+        for md in loaded[1:]:
+            common = common.intersection(md.close_prices().index)
 
         merged_bars: dict[str, pd.DataFrame] = {}
-        for t in eq.tickers:
-            merged_bars[t] = eq.bars[t].loc[common]
-        for t in co.tickers:
-            merged_bars[t] = co.bars[t].loc[common]
+        combined_tickers: list[str] = []
+        combined_classes: dict[str, AssetClass] = {}
 
-        combined_tickers = eq.tickers + co.tickers
-        combined_classes = {
-            **{t: AssetClass.EQUITY for t in eq.tickers},
-            **co.asset_classes,
-        }
+        for md in loaded:
+            for t in md.tickers:
+                merged_bars[t] = md.bars[t].loc[common]
+                combined_classes[t] = md.asset_classes.get(t, AssetClass.EQUITY)
+            combined_tickers.extend(md.tickers)
+
         return MarketData(
             tickers=combined_tickers,
             bars=merged_bars,
             asset_classes=combined_classes,
+        )
+
+
+# ============================================================================
+# HOUSING / REAL ESTATE DATA SOURCES
+# ============================================================================
+
+# Friendly display name -> Yahoo Finance ticker (ETFs, not futures)
+HOUSING_YFINANCE_SYMBOLS: dict[str, str] = {
+    "HOUSING":      "VNQ",   # Vanguard Real Estate ETF — broad REIT index
+    "HOMEBUILDERS": "ITB",   # iShares U.S. Home Construction ETF
+    "MORTGAGES":    "REM",   # iShares Mortgage Real Estate ETF
+    "COMMERCIAL_RE":"IYR",   # iShares U.S. Real Estate ETF (commercial)
+    "RESIDENTIAL":  "REZ",   # iShares Residential & Multisector Real Estate ETF
+}
+
+# Realistic synthetic parameters: (annual_drift, annual_vol, start_price)
+_HOUSING_MOCK_PARAMS: dict[str, tuple[float, float, float]] = {
+    "HOUSING":       (0.08, 0.18,  90.0),
+    "HOMEBUILDERS":  (0.12, 0.28,  85.0),
+    "MORTGAGES":     (0.06, 0.22,  25.0),
+    "COMMERCIAL_RE": (0.07, 0.20,  95.0),
+    "RESIDENTIAL":   (0.08, 0.19,  80.0),
+}
+
+# Intra-group correlation matrix — rows/cols ordered as the keys above.
+# Broad REIT ETFs are highly correlated; homebuilders and mortgage REITs
+# are more idiosyncratic but still linked.
+_HOUSING_CORR: np.ndarray = np.array([
+    #  HOUS  HOME  MORT  COMM  RESI
+    [1.00, 0.65, 0.55, 0.78, 0.80],  # HOUSING
+    [0.65, 1.00, 0.40, 0.60, 0.65],  # HOMEBUILDERS
+    [0.55, 0.40, 1.00, 0.55, 0.58],  # MORTGAGES
+    [0.78, 0.60, 0.55, 1.00, 0.72],  # COMMERCIAL_RE
+    [0.80, 0.65, 0.58, 0.72, 1.00],  # RESIDENTIAL
+])
+
+
+class HousingDataSource:
+    """Fetches housing / real estate ETF data via yfinance.
+
+    Uses human-readable names (``HOUSING``, ``HOMEBUILDERS``, ``MORTGAGES``,
+    ``COMMERCIAL_RE``, ``RESIDENTIAL``) mapped internally to liquid ETF tickers
+    (``VNQ``, ``ITB``, ``REM``, ``IYR``, ``REZ``).  Returns a ``MarketData``
+    with ``asset_classes`` set to ``AssetClass.REAL_ESTATE`` for every ticker.
+
+    Parameters
+    ----------
+    instruments : list[str] | None
+        Subset of ``HOUSING_YFINANCE_SYMBOLS`` keys to load.
+        Defaults to all five.
+    start : str
+        Start date in ``YYYY-MM-DD`` format.
+    end : str | None
+        End date (exclusive). Defaults to today.
+    """
+
+    DEFAULT_INSTRUMENTS: list[str] = list(HOUSING_YFINANCE_SYMBOLS)
+
+    def __init__(
+        self,
+        instruments: list[str] | None = None,
+        start: str = "2023-01-01",
+        end: str | None = None,
+    ) -> None:
+        self.instruments = instruments or self.DEFAULT_INSTRUMENTS
+        self.start = start
+        self.end = end or pd.Timestamp.today().strftime("%Y-%m-%d")
+
+    def load(self) -> MarketData:
+        """Download housing ETF data and return a ``MarketData`` contract."""
+        import yfinance as yf
+
+        yf_symbols = [HOUSING_YFINANCE_SYMBOLS[i] for i in self.instruments]
+
+        raw = yf.download(
+            yf_symbols,
+            start=self.start,
+            end=self.end,
+            auto_adjust=True,
+            progress=False,
+        )
+
+        bars: dict[str, pd.DataFrame] = {}
+        for name, symbol in zip(self.instruments, yf_symbols):
+            if isinstance(raw.columns, pd.MultiIndex):
+                df = raw.xs(symbol, axis=1, level=1).dropna()
+            else:
+                df = raw.dropna()
+            df = df.rename(columns=str.lower)
+            bars[name] = df[["open", "high", "low", "close", "volume"]]
+
+        asset_classes = {i: AssetClass.REAL_ESTATE for i in self.instruments}
+        return MarketData(
+            tickers=self.instruments,
+            bars=bars,
+            asset_classes=asset_classes,
+        )
+
+
+class MockHousingDataSource:
+    """Synthetic housing / real estate data with realistic block-correlation.
+
+    Generates correlated daily OHLCV for the five standard real estate
+    instruments using the same Cholesky construction as ``MockDataSource``.
+    Broad REIT ETFs are highly correlated (~0.72–0.80); homebuilders and
+    mortgage REITs are more idiosyncratic but still linked (~0.40–0.65).
+
+    Parameters
+    ----------
+    instruments : list[str] | None
+        Subset of the five instruments to generate.  Defaults to all five.
+    n_days : int
+        Number of business days of history (default 504 ≈ 2 years).
+    seed : int
+        Random seed for reproducibility.
+    """
+
+    DEFAULT_INSTRUMENTS: list[str] = list(_HOUSING_MOCK_PARAMS)
+
+    def __init__(
+        self,
+        instruments: list[str] | None = None,
+        n_days: int = 504,
+        seed: int = 99,
+    ) -> None:
+        self.instruments = instruments or self.DEFAULT_INSTRUMENTS
+        self.n_days = n_days
+        self.seed = seed
+
+    def load(self) -> MarketData:
+        """Generate synthetic housing OHLCV and return a ``MarketData`` contract."""
+        rng = np.random.default_rng(self.seed)
+
+        all_names = list(_HOUSING_MOCK_PARAMS)
+        indices = [all_names.index(i) for i in self.instruments]
+
+        corr = _HOUSING_CORR[np.ix_(indices, indices)].copy()
+        L = np.linalg.cholesky(corr)
+
+        dates = pd.bdate_range(
+            end=pd.Timestamp.today().normalize(), periods=self.n_days
+        )
+        n = len(dates)
+        n_assets = len(self.instruments)
+
+        mu  = np.array([_HOUSING_MOCK_PARAMS[i][0] for i in self.instruments]) / 252
+        sig = np.array([_HOUSING_MOCK_PARAMS[i][1] for i in self.instruments]) / np.sqrt(252)
+
+        z = rng.standard_normal((n, n_assets))
+        daily_returns = mu + sig * (z @ L.T)
+
+        bars: dict[str, pd.DataFrame] = {}
+        for idx, name in enumerate(self.instruments):
+            start_price = _HOUSING_MOCK_PARAMS[name][2]
+            close = start_price * np.cumprod(1 + daily_returns[:, idx])
+
+            open_ = np.concatenate([[close[0]], close[:-1]]) * (
+                1 + rng.normal(0, 0.001, n)
+            )
+            high = np.maximum(open_, close) * (1 + np.abs(rng.normal(0, 0.003, n)))
+            low  = np.minimum(open_, close) * (1 - np.abs(rng.normal(0, 0.003, n)))
+            # ETF volume scale (shares traded daily)
+            volume = rng.integers(500_000, 5_000_000, n).astype(float)
+
+            bars[name] = pd.DataFrame(
+                {"open": open_, "high": high, "low": low, "close": close, "volume": volume},
+                index=dates,
+            )
+
+        asset_classes = {i: AssetClass.REAL_ESTATE for i in self.instruments}
+        return MarketData(
+            tickers=self.instruments,
+            bars=bars,
+            asset_classes=asset_classes,
         )

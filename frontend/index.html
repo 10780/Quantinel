@@ -153,6 +153,8 @@
       <div id="tk_btns" class="tkwrap"></div>
       <label style="margin-top:10px;margin-bottom:2px">Commodities <span style="color:var(--mut);font-weight:400">(click to toggle)</span></label>
       <div id="cm_btns" class="tkwrap"></div>
+      <label style="margin-top:10px;margin-bottom:2px">Real Estate <span style="color:var(--mut);font-weight:400">(click to toggle)</span></label>
+      <div id="re_btns" class="tkwrap"></div>
       <div class="addrow"><input id="tk_add" placeholder="add ticker(s)"/><button id="tk_addbtn">+ add</button></div>
       <div class="row" style="margin-top:8px">
         <div><label>Start (live)</label><input id="start" value="2023-01-01"/></div>
@@ -296,7 +298,8 @@ $('qr_lbl').textContent=$('queue_round').value;
 // ---- ticker buttons ----
 const EQUITIES=["NVDA","GOOG","AAPL","MSFT","AMZN","META","TSLA","AMD","NFLX","INTC","AVGO","ADBE","CRM","ORCL","QCOM","CSCO"];
 const COMMODITIES=["GOLD","SILVER","PLATINUM","PALLADIUM","OIL"];
-const UNIVERSE=[...EQUITIES,...COMMODITIES];
+const HOUSING=["HOUSING","HOMEBUILDERS","MORTGAGES","COMMERCIAL_RE","RESIDENTIAL"];
+const UNIVERSE=[...EQUITIES,...COMMODITIES,...HOUSING];
 const DEFAULT_ON=new Set(EQUITIES.slice(0,10));
 function addTickerBtn(t,on,group){
   const wrap=$(group||'tk_btns');
@@ -309,18 +312,21 @@ function addTickerBtn(t,on,group){
 }
 EQUITIES.forEach(t=>addTickerBtn(t,DEFAULT_ON.has(t),'tk_btns'));
 COMMODITIES.forEach(t=>addTickerBtn(t,false,'cm_btns'));
+HOUSING.forEach(t=>addTickerBtn(t,false,'re_btns'));
 $('tk_addbtn').onclick=()=>{
   const v=$('tk_add').value.trim().toUpperCase();
   if(v) v.split(/[ ,]+/).filter(Boolean).forEach(t=>{
     const isCom=COMMODITIES.includes(t)||['GC=F','SI=F','PL=F','PA=F','CL=F'].includes(t);
-    addTickerBtn(t,true,isCom?'cm_btns':'tk_btns');
+    const isRe=HOUSING.includes(t)||['VNQ','ITB','REM','IYR','REZ'].includes(t);
+    addTickerBtn(t,true,isCom?'cm_btns':isRe?'re_btns':'tk_btns');
   });
   $('tk_add').value='';
 };
 function selectedTickers(){
   const eq=[...document.querySelectorAll('#tk_btns .tkbtn.on')].map(b=>b.dataset.t);
   const cm=[...document.querySelectorAll('#cm_btns .tkbtn.on')].map(b=>b.dataset.t);
-  const all=[...eq,...cm];
+  const re=[...document.querySelectorAll('#re_btns .tkbtn.on')].map(b=>b.dataset.t);
+  const all=[...eq,...cm,...re];
   return all.length?all.join(','):EQUITIES.slice(0,10).join(',');
 }
 
@@ -466,6 +472,8 @@ function universePanel(u){
     const cls=a.asset_class||'equity';
     const clsBadge=cls==='commodity'
       ?'<span class="badge" style="border-color:#fbbf24;color:#fbbf24">CMD</span>'
+      :cls==='real_estate'
+      ?'<span class="badge" style="border-color:#34d399;color:#34d399">RE</span>'
       :'<span class="badge" style="border-color:var(--mut);color:var(--mut)">EQ</span>';
     return `<tr><td><b>${esc(a.ticker)}</b> ${clsBadge}</td>
       <td style="min-width:140px"><div class="bar"><span style="width:${w}%;background:${col}"></span></div></td>

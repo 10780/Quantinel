@@ -3,7 +3,7 @@ LAYER 2.5 — CHAOS ENGINE  (owner: GT (10780))
 
 Wildcard / tail-event detector that fuses quantum-encoded market signals
 with world-news sentiment to estimate the probability of an adverse
-"black-swan" event (crash, liquidity crisis, sector collapse, etc.).
+"black swan" event (crash, liquidity crisis, sector collapse, etc.).
 
 Pipeline integration example (run_baseline.py)::
 

@@ -30,6 +30,7 @@ category. Current values:
 |---|---|
 | `EQUITY` | Common stocks (e.g. NVDA, GOOG) — default when no tag is set |
 | `COMMODITY` | Physical commodity futures: GOLD (`GC=F`), SILVER (`SI=F`), PLATINUM (`PL=F`), PALLADIUM (`PA=F`), OIL (`CL=F`) |
+| `REAL_ESTATE` | Housing / real estate ETFs: HOUSING (`VNQ`), HOMEBUILDERS (`ITB`), MORTGAGES (`REM`), COMMERCIAL_RE (`IYR`), RESIDENTIAL (`REZ`) |
 
 Consumed by `MarketData.asset_class()` and `MarketData.tickers_by_class()` so
 any layer can filter the universe by type without inspecting ticker names.
@@ -161,11 +162,12 @@ per-step risk data stored during the backtest.
 | `YFinanceDataSource` | Equity | Yahoo Finance (live) | Any equity ticker list. |
 | `MockCommodityDataSource` | Commodity | synthetic (Cholesky) | GOLD, SILVER, PLATINUM, PALLADIUM, OIL with block-correlation structure. |
 | `CommodityDataSource` | Commodity | Yahoo Finance futures (live) | Maps friendly names to `GC=F`, `SI=F`, `PL=F`, `PA=F`, `CL=F`. |
-| `CombinedDataSource` | Equity + Commodity | wraps any two sources | Merges both universes on the intersection of business-day dates; sets `asset_classes` on the returned `MarketData`. |
+| `MockHousingDataSource` | Real Estate | synthetic (Cholesky) | HOUSING, HOMEBUILDERS, MORTGAGES, COMMERCIAL_RE, RESIDENTIAL with block-correlation structure. |
+| `HousingDataSource` | Real Estate | Yahoo Finance ETFs (live) | Maps friendly names to `VNQ`, `ITB`, `REM`, `IYR`, `REZ`. |
+| `CombinedDataSource` | any mix | wraps 2+ sources | Accepts any number of sources; merges all universes on the intersection of business-day dates; preserves `asset_classes` tags on the returned `MarketData`. |
 
-`COMMODITY_YFINANCE_SYMBOLS` (dict exported from `data.py`) maps the canonical
-names used throughout the pipeline (`GOLD`, `SILVER`, …) to their Yahoo Finance
-futures symbols.
+`COMMODITY_YFINANCE_SYMBOLS` and `HOUSING_YFINANCE_SYMBOLS` (dicts exported from
+`data.py`) map canonical pipeline names to their Yahoo Finance symbols.
 
 ---
 

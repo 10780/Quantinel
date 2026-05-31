@@ -12,10 +12,11 @@ intelligence, and a decision trace, then explains which branch won in simple
 terms.
 
 The pipeline supports multiple asset classes in a single universe. The current
-supported classes are **equities** (e.g. NVDA, GOOG) and **commodities**
-(Gold, Silver, Platinum, Palladium, Oil). Every downstream layer — Forecast,
-Risk, Optimizer, Executor, Scorer — is ticker-agnostic and works unchanged on
-any mixed universe.
+supported classes are **equities** (e.g. NVDA, GOOG), **commodities**
+(Gold, Silver, Platinum, Palladium, Oil), and **real estate**
+(Housing/VNQ, Homebuilders/ITB, Mortgages/REM, Commercial RE/IYR, Residential/REZ).
+Every downstream layer — Forecast, Risk, Optimizer, Executor, Scorer — is
+ticker-agnostic and works unchanged on any mixed universe.
 
 ## Current workflow
 
@@ -397,24 +398,31 @@ with its broad category. Supported values:
 |---|---|---|---|
 | `EQUITY` | NVDA, GOOG, … | `YFinanceDataSource` | `MockDataSource` |
 | `COMMODITY` | GOLD, SILVER, PLATINUM, PALLADIUM, OIL | `CommodityDataSource` | `MockCommodityDataSource` |
+| `REAL_ESTATE` | HOUSING, HOMEBUILDERS, MORTGAGES, COMMERCIAL_RE, RESIDENTIAL | `HousingDataSource` | `MockHousingDataSource` |
 
 `MarketData` exposes two helpers for asset-class-aware logic:
 
 ```python
-data.asset_class("GOLD")                       # AssetClass.COMMODITY
-data.tickers_by_class(AssetClass.COMMODITY)    # ["GOLD", "SILVER", ...]
+data.asset_class("GOLD")                          # AssetClass.COMMODITY
+data.asset_class("HOUSING")                       # AssetClass.REAL_ESTATE
+data.tickers_by_class(AssetClass.REAL_ESTATE)     # ["HOUSING", "HOMEBUILDERS", ...]
 ```
 
-To run the combined equity + commodity universe:
+To run a combined equity + commodity + housing universe:
 
 ```python
-from data import CombinedDataSource, MockDataSource, MockCommodityDataSource
-source = CombinedDataSource(MockDataSource(), MockCommodityDataSource())
+from data import (CombinedDataSource, MockDataSource,
+                  MockCommodityDataSource, MockHousingDataSource)
+source = CombinedDataSource(
+    MockDataSource(),
+    MockCommodityDataSource(),
+    MockHousingDataSource(),
+)
 ```
 
-For real data replace either source with `YFinanceDataSource` or
-`CommodityDataSource`. Commodity futures use Yahoo Finance symbols
-(`GC=F`, `SI=F`, `PL=F`, `PA=F`, `CL=F`) mapped internally.
+`CombinedDataSource` accepts any number of source arguments and aligns them
+on the intersection of business days. For real data replace mock sources with
+`YFinanceDataSource`, `CommodityDataSource`, or `HousingDataSource`.
 
 ### Commodity mock parameters
 
@@ -429,6 +437,22 @@ For real data replace either source with `YFinanceDataSource` or
 Precious metals (GOLD, SILVER, PLATINUM, PALLADIUM) share a correlation of
 ≈ 0.55–0.60 with each other. OIL has a weaker correlation of ≈ 0.15–0.20
 with the precious-metals group.
+
+### Housing / Real Estate mock parameters
+
+| Ticker | Annual drift | Annual vol | Start price | yfinance ETF |
+|--------|-------------|------------|-------------|--------------|
+| HOUSING | 8% | 18% | $90 | VNQ |
+| HOMEBUILDERS | 12% | 28% | $85 | ITB |
+| MORTGAGES | 6% | 22% | $25 | REM |
+| COMMERCIAL_RE | 7% | 20% | $95 | IYR |
+| RESIDENTIAL | 8% | 19% | $80 | REZ |
+
+Broad REIT ETFs (HOUSING, COMMERCIAL_RE, RESIDENTIAL) are highly correlated
+with each other (≈ 0.72–0.80). HOMEBUILDERS and MORTGAGES are more
+idiosyncratic but still linked to the group (≈ 0.40–0.65).
+Correlation with commodities and equities is lower (≈ 0.10–0.35 and 0.30–0.50
+respectively).
 
 ## Current interpretation
 

@@ -1,0 +1,1167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Quantinel — UI Mockup (Multi-Asset + Crystal Ball)</title>
+<style>
+  :root{
+    --bg:#0a0e17; --panel:#121826; --panel2:#0f1420; --line:#222c40;
+    --ink:#e6ecf5; --mut:#8b97ad; --quantum:#a78bfa; --ml:#34d399;
+    --meta:#fbbf24; --accent:#38bdf8; --bad:#f87171; --good:#34d399;
+    --ibm:#60a5fa; --cmd:#fbbf24; --re:#34d399;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  a{color:var(--accent)}
+
+  /* ========= layout ========= */
+  .wrap{display:grid;grid-template-columns:330px 1fr;min-height:100vh}
+  .side{background:var(--panel2);border-right:1px solid var(--line);
+    padding:18px;position:sticky;top:0;height:100vh;overflow:auto}
+  .main{padding:22px 26px}
+
+  /* ========= sidebar pieces ========= */
+  .brand{font-size:18px;font-weight:700;letter-spacing:.3px}
+  .brand b{color:var(--accent)}
+  .sub-tag{color:var(--mut);font-size:12px;margin-bottom:14px}
+  .grp{border:1px solid var(--line);border-radius:10px;padding:12px;margin:12px 0;background:var(--panel)}
+  .grp h4{margin:0 0 10px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
+  label{display:block;font-size:12px;color:var(--mut);margin:8px 0 4px}
+  input,select{width:100%;background:var(--panel2);border:1px solid var(--line);
+    color:var(--ink);border-radius:8px;padding:8px 9px;font-size:13px}
+  input[type=range]{padding:0}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .chk{display:flex;align-items:center;gap:8px;margin:8px 0;color:var(--ink);font-size:13px}
+  .chk input{width:auto}
+  .val{float:right;color:var(--ink);font-weight:600}
+  .run{width:100%;margin-top:14px;padding:13px;border:0;border-radius:10px;
+    background:linear-gradient(135deg,var(--accent),#6366f1);color:#06121f;
+    font-weight:800;font-size:15px;cursor:pointer;letter-spacing:.3px}
+  .run:hover{opacity:.9}
+  .run.alt{margin-top:0;flex:1;min-width:130px;font-size:13px;padding:11px;
+    background:var(--panel2);border:1px solid var(--line);color:var(--ink)}
+  .run.alt:hover{border-color:var(--accent)}
+  .pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .pill{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid var(--line);color:var(--mut)}
+  .pill.on{color:#06121f;font-weight:700}
+  .pill.xpyq-on{background:var(--quantum);border-color:var(--quantum)}
+  .pill.ibm-on{background:var(--ibm);border-color:var(--ibm)}
+  .pill.cl-on{background:var(--good);border-color:var(--good)}
+  .pill.or-on{background:var(--meta);border-color:var(--meta)}
+  .tkwrap{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+  .tkbtn{padding:5px 9px;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--mut);font-size:12px;font-weight:700;cursor:pointer;
+    transition:all .15s}
+  .tkbtn:hover{border-color:var(--accent);color:var(--ink)}
+  .tkbtn.on.eq{background:var(--accent);border-color:var(--accent);color:#06121f}
+  .tkbtn.on.cmd{background:var(--cmd);border-color:var(--cmd);color:#06121f}
+  .tkbtn.on.re{background:var(--re);border-color:var(--re);color:#06121f}
+
+  /* ========= main page ========= */
+  h2{margin:0 0 2px}
+  .page-sub{color:var(--mut);margin-bottom:16px}
+  .flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 20px;
+    color:var(--mut);font-size:12px}
+  .node{padding:6px 11px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+  .node.q{border-color:var(--quantum);color:var(--quantum)}
+  .node.m{border-color:var(--ml);color:var(--ml)}
+  .node.x{border-color:var(--meta);color:var(--meta)}
+  .node.cb{border-color:var(--accent);color:var(--accent)}
+  .arrow{color:var(--line)}
+
+  /* ========= cards ========= */
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .card.full{grid-column:1/-1}
+  .card.lab{border-color:var(--quantum);
+    background:linear-gradient(180deg,#15102a22,var(--panel));margin-bottom:16px}
+  .card.cb-card{border-color:var(--accent);
+    background:linear-gradient(180deg,#06161f44,var(--panel))}
+
+  .chead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .ctitle{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .q .dot{background:var(--quantum)} .ml .dot{background:var(--ml)} .x .dot{background:var(--meta)}
+  .badge{font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--mut)}
+  .badge.live{color:#06121f;font-weight:700}
+  .badge.q-live{background:var(--quantum);border-color:var(--quantum)}
+  .badge.m-live{background:var(--ml);border-color:var(--ml)}
+  .badge.x-live{background:var(--meta);border-color:var(--meta)}
+  .badge.a-live{background:var(--accent);border-color:var(--accent)}
+  .badge.bad-live{background:var(--bad);border-color:var(--bad)}
+
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 12px}
+  .chip{padding:4px 10px;border-radius:8px;font-size:13px;font-weight:700;
+    background:var(--panel2);border:1px solid var(--line)}
+  .q .chip{border-color:var(--quantum);color:var(--quantum)}
+  .ml .chip{border-color:var(--ml);color:var(--ml)}
+  .x .chip{border-color:var(--meta);color:var(--meta)}
+  .chip.cmd{border-color:var(--cmd);color:var(--cmd)}
+  .chip.re{border-color:var(--re);color:var(--re)}
+  .chip.eq{border-color:var(--accent);color:var(--accent)}
+
+  .gauge{display:flex;align-items:center;gap:10px}
+  .ring{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;
+    font-weight:800;font-size:13px;flex:none}
+  .lbl{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.1em;
+    margin:14px 0 6px}
+  .reason{font-size:13px;margin:5px 0;color:var(--ink)}
+  .reason b{color:var(--mut);font-weight:600}
+  .rej{font-size:12.5px;color:var(--mut);margin:4px 0}
+  .rej b{color:var(--bad)}
+  .sigs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+  .sig{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  .sig .k{font-size:11px;color:var(--mut)} .sig .v{font-size:15px;font-weight:700}
+  .cav{font-size:12px;color:var(--mut);margin:3px 0}
+  .stat{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:6px 0 4px}
+  .box{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center}
+  .box .v{font-size:24px;font-weight:800}
+  .box .k{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.1em}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:8px}
+  th,td{padding:7px 8px;text-align:left;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+  td.q{color:var(--quantum)} td.m{color:var(--ml)} td.x{color:var(--meta)}
+
+  .bar{height:9px;border-radius:5px;background:var(--panel2);overflow:hidden}
+  .bar>span{display:block;height:100%}
+
+  .seen{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px}
+  .think{background:linear-gradient(135deg,#1a1305,#121826);border:1px solid var(--meta);
+    border-radius:10px;padding:14px}
+  .think .r{font-size:13px;line-height:1.6}
+  pre{white-space:pre-wrap;word-break:break-word;font-size:11px;color:var(--mut);
+    max-height:260px;overflow:auto;margin:6px 0 0;border:1px solid var(--line);
+    background:var(--panel2);border-radius:8px;padding:10px}
+
+  .meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+  /* asset-class badges inline */
+  .cls-eq{font-size:10px;padding:1px 6px;border-radius:999px;
+    border:1px solid var(--mut);color:var(--mut)}
+  .cls-cmd{font-size:10px;padding:1px 6px;border-radius:999px;
+    border:1px solid var(--cmd);color:var(--cmd)}
+  .cls-re{font-size:10px;padding:1px 6px;border-radius:999px;
+    border:1px solid var(--re);color:var(--re)}
+
+  /* crystal ball specific */
+  .cb-section{margin:14px 0 8px;padding:10px 14px;background:var(--panel2);
+    border:1px solid var(--line);border-radius:10px}
+  .cb-section h5{margin:0 0 8px;font-size:11px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--accent)}
+  .cb-ticker-row{display:flex;align-items:center;gap:8px;padding:6px 0;
+    border-bottom:1px solid var(--line);font-size:12.5px}
+  .cb-ticker-row:last-child{border-bottom:none}
+  .scenario-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;flex:1}
+  .sc-box{background:var(--panel);border:1px solid var(--line);border-radius:7px;
+    padding:5px 8px;text-align:center}
+  .sc-box .sv{font-size:13px;font-weight:700}
+  .sc-box .sk{font-size:10px;color:var(--mut)}
+  .sc-box.bull .sv{color:var(--good)}
+  .sc-box.bear .sv{color:var(--bad)}
+  .sc-box.crash .sv{color:var(--bad)}
+  .sc-box.base .sv{color:var(--accent)}
+
+  .signal-tag{display:inline-block;padding:2px 7px;border-radius:999px;
+    font-size:10px;margin:2px;font-weight:600}
+  .signal-tag.warn{background:#2a1a06;border:1px solid var(--meta);color:var(--meta)}
+  .signal-tag.ok{background:#061a10;border:1px solid var(--good);color:var(--good)}
+  .signal-tag.bad{background:#1a0606;border:1px solid var(--bad);color:var(--bad)}
+
+  .curve-tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;
+    display:inline-block;margin-left:4px}
+  .curve-asc{background:#061a10;color:var(--good)}
+  .curve-peak{background:#1a1306;color:var(--meta)}
+  .curve-dec{background:#1a0606;color:var(--bad)}
+  .curve-emerge{background:#06101a;color:var(--accent)}
+  .curve-trans{background:#141420;color:var(--mut)}
+
+  .crash-prob-bar{height:16px;border-radius:8px;background:var(--panel2);
+    overflow:hidden;margin:6px 0}
+  .crash-prob-bar span{display:block;height:100%}
+
+  .collapse-btn{background:none;border:none;color:var(--mut);font-size:12px;
+    cursor:pointer;padding:0;margin-top:8px;text-decoration:underline}
+
+  /* tooltip/info hover pattern */
+  .info{display:inline-block;width:14px;height:14px;border-radius:50%;
+    border:1px solid var(--mut);color:var(--mut);font-size:10px;
+    text-align:center;line-height:14px;cursor:help;margin-left:4px;vertical-align:middle}
+
+  @media(max-width:1000px){
+    .wrap{grid-template-columns:1fr}.side{position:static;height:auto}
+    .cards,.meta-grid,.stat,.scenario-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<!-- ==================== SIDEBAR ==================== -->
+<aside class="side">
+  <div class="brand"><b>◈</b> Quantinel</div>
+  <div class="sub-tag">Multi-asset portfolio · 3 agents · Crystal Ball</div>
+
+  <div class="grp">
+    <h4>Data source</h4>
+    <select>
+      <option selected>Synthetic (offline, instant)</option>
+      <option>Live (yfinance)</option>
+    </select>
+    <div class="row" style="margin-top:8px">
+      <div><label>Start (live)</label><input value="2023-01-01"/></div>
+      <div><label>End (live)</label><input value="2024-12-31"/></div>
+    </div>
+    <div class="row">
+      <div><label>Synthetic days</label><input type="number" value="320"/></div>
+      <div><label>Seed</label><input type="number" value="7"/></div>
+    </div>
+  </div>
+
+  <div class="grp">
+    <h4>Universe</h4>
+
+    <label>Equities <span style="font-weight:400;color:var(--mut)">(click to toggle)</span></label>
+    <div id="tk_btns" class="tkwrap">
+      <!-- filled by JS -->
+    </div>
+
+    <label style="margin-top:10px">Commodities</label>
+    <div id="cm_btns" class="tkwrap"></div>
+
+    <label style="margin-top:10px">Real Estate</label>
+    <div id="re_btns" class="tkwrap"></div>
+
+    <div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:8px">
+      <input placeholder="add ticker(s)…"/>
+      <button style="border:1px solid var(--line);background:var(--panel2);color:var(--ink);
+        border-radius:8px;padding:0 12px;cursor:pointer;font-weight:700">+ add</button>
+    </div>
+  </div>
+
+  <div class="grp">
+    <h4>Objective</h4>
+    <label>Cardinality K <span class="val" id="Kv">4</span></label>
+    <input id="K" type="range" min="1" max="12" value="4"/>
+    <label>Risk aversion λ <span class="val" id="lamv">4.0</span></label>
+    <input id="lam" type="range" min="0" max="20" step="0.5" value="4"/>
+    <label>QUBO penalty P</label>
+    <input value="auto"/>
+  </div>
+
+  <div class="grp">
+    <h4>Walk-forward</h4>
+    <label>Rebalance every <span class="val" id="rebv">10</span> d</label>
+    <input id="reb" type="range" min="1" max="30" value="10"/>
+    <label>Lookback <span class="val" id="lbv">120</span> d</label>
+    <input id="lb" type="range" min="20" max="252" value="120"/>
+    <label>Holding period <span class="val" id="hpv">5</span> d</label>
+    <input id="hp" type="range" min="1" max="20" value="5"/>
+  </div>
+
+  <div class="grp">
+    <h4>Crystal Ball <span class="info" title="Scenario forecaster — fuses ChaosEngine tail-risk with xpyq eigendecomposition">?</span></h4>
+    <div class="chk"><input type="checkbox" id="cb_on" checked/><span>Enable Crystal Ball forecast</span></div>
+    <label>Horizon</label>
+    <select id="cb_horizon">
+      <option value="63">3 months (63 d)</option>
+      <option value="126">6 months (126 d)</option>
+      <option value="252" selected>1 year (252 d)</option>
+      <option value="504">2 years (504 d)</option>
+    </select>
+    <label>Vol-surge threshold (equity) <span class="val" id="vsv">1.8</span>×</label>
+    <input id="vs" type="range" min="1.2" max="3.0" step="0.1" value="1.8"/>
+    <label>Drawdown warning floor (equity) <span class="val" id="ddv">8</span>%</label>
+    <input id="dd" type="range" min="3" max="20" value="8"/>
+  </div>
+
+  <div class="grp">
+    <h4>Quantum backend</h4>
+    <div class="chk"><input type="checkbox" checked/><span>Use xpyq in pipeline</span></div>
+    <label>Poll budget <span class="val">60</span>s</label>
+    <input type="range" min="10" max="180" value="60"/>
+  </div>
+
+  <div class="grp">
+    <h4>Meta backend</h4>
+    <div class="chk"><input type="checkbox" checked/><span>Use Claude (Anthropic)</span></div>
+    <div class="chk"><input type="checkbox"/><span>Force deterministic</span></div>
+  </div>
+
+  <button class="run" id="run_btn">▶ Run pipeline</button>
+
+  <div class="pills" style="margin-top:10px">
+    <span class="pill on xpyq-on">xpyq 1 420 cr</span>
+    <span class="pill on ibm-on">IBM BYOK</span>
+    <span class="pill on cl-on">Claude ready</span>
+    <span class="pill">OpenRouter off</span>
+  </div>
+</aside>
+
+<!-- ==================== MAIN ==================== -->
+<main class="main">
+  <h2>Multi-Agent Portfolio Selection</h2>
+  <div class="page-sub">QuantumAgent &amp; MLAgent each propose K assets across equities, commodities &amp; real estate;
+    the MetaAgent arbitrates. Crystal Ball projects 1-year scenarios per ticker per asset class.</div>
+
+  <!-- pipeline flow -->
+  <div class="flow">
+    <span class="node">data (12 assets)</span>
+    <span class="arrow">→</span>
+    <span class="node q">QuantumAgent</span>
+    <span class="node m">MLAgent</span>
+    <span class="arrow">→</span>
+    <span class="node x">MetaAgent</span>
+    <span class="arrow">→</span>
+    <span class="node cb">Crystal Ball</span>
+    <span class="arrow">→</span>
+    <span class="node">ChaosEngine</span>
+    <span class="arrow">→</span>
+    <span class="node">score</span>
+  </div>
+
+  <!-- ===== data summary strip ===== -->
+  <div id="data_strip" style="color:var(--mut);font-size:13px;margin-bottom:16px;
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px">
+    synthetic data · 320 rows · <b style="color:var(--ink)">12 assets</b>
+    (2 eq · 5 cmd · 5 re) · 32 rebalances · as of <b style="color:var(--ink)">2026-05-29</b>
+    <span style="float:right;color:var(--accent);font-weight:700">completed in 1 847 ms</span>
+  </div>
+
+  <!-- ===== Quantum Hardware Lab ===== -->
+  <div class="card full lab" id="lab" style="margin-bottom:16px">
+    <div class="chead">
+      <div class="ctitle" style="color:var(--quantum)">
+        <span class="dot" style="background:var(--quantum)"></span>Quantum Hardware Lab
+      </div>
+      <span class="badge live q-live">xpyq completed ✓</span>
+    </div>
+    <div class="reason" style="color:var(--mut);margin-bottom:12px">
+      Solves the cardinality-QUBO on the backend of your choice. All backends solve the same
+      problem — compare results. <b style="color:var(--quantum)">xpyq</b> evaluates every
+      C(N,K) subset in one <code style="color:var(--quantum)">matmul</code>;
+      the Aer simulator &amp; IBM run a p=1 QAOA circuit; local is exact brute force.
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="run alt" id="btn_xpyq" style="border-color:var(--quantum);color:var(--quantum)">⚛ Submit to xpyq queue</button>
+      <button class="run alt" id="btn_sim">🔬 Aer simulator</button>
+      <button class="run alt" id="btn_ibm">🖥 IBM QPU</button>
+      <button class="run alt" id="btn_local">⚡ Local solve</button>
+    </div>
+    <!-- result pane -->
+    <div id="lab_result" style="margin-top:14px">
+      <div class="lbl" style="margin-top:0">solved on <b style="color:var(--quantum)">xpyq compute</b></div>
+      <div class="chips">
+        <span class="chip" style="border-color:var(--quantum);color:var(--quantum)">GOLD</span>
+        <span class="chip" style="border-color:var(--quantum);color:var(--quantum)">OIL</span>
+        <span class="chip" style="border-color:var(--quantum);color:var(--quantum)">NVDA</span>
+        <span class="chip" style="border-color:var(--quantum);color:var(--quantum)">HOUSING</span>
+      </div>
+      <div class="reason">ground-state energy x'Qx = <b>−2.8341</b></div>
+      <div class="rej">runner-up: SILVER, HOMEBUILDERS · ΔE = 0.1027</div>
+      <div class="sigs" style="margin-top:10px">
+        <div class="sig"><div class="k">backend</div><div class="v" style="font-size:13px">xpyq hardware</div></div>
+        <div class="sig"><div class="k">N / K</div><div class="v" style="font-size:13px">12 / 4</div></div>
+        <div class="sig"><div class="k">subsets evaluated</div><div class="v" style="font-size:13px">495</div></div>
+        <div class="sig"><div class="k">credits used</div><div class="v" style="font-size:13px">3</div></div>
+        <div class="sig"><div class="k">duration</div><div class="v" style="font-size:13px">1 420 ms</div></div>
+        <div class="sig"><div class="k">penalty P</div><div class="v" style="font-size:13px">2.417</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Agent cards ===== -->
+  <div class="cards" id="agent_cards">
+    <!-- Quantum Agent -->
+    <div class="card q">
+      <div class="chead">
+        <div class="ctitle"><span class="dot"></span>QuantumAgent</div>
+        <span class="badge live q-live">xpyq hardware</span>
+      </div>
+      <div class="gauge">
+        <div class="ring" style="background:conic-gradient(var(--quantum) 302deg,#1d2536 0)">
+          <div style="width:40px;height:40px;border-radius:50%;background:var(--panel);
+            display:grid;place-items:center">84</div>
+        </div>
+        <div>
+          <div class="lbl" style="margin:0">confidence</div>
+          <div style="font-size:13px;color:var(--mut)">Multi-asset QUBO selects high-momentum
+            commodities to hedge equity vol</div>
+        </div>
+      </div>
+      <div class="lbl">selected basket (K = 4)</div>
+      <div class="chips">
+        <span class="chip">GOLD</span>
+        <span class="chip">OIL</span>
+        <span class="chip">NVDA</span>
+        <span class="chip">HOUSING</span>
+      </div>
+      <div class="lbl">per-ticker reasoning</div>
+      <div class="reason"><b>GOLD</b> — dominant commodity factor eigenvector loading 0.61; inflation hedge signal active</div>
+      <div class="reason"><b>OIL</b> — factor momentum +14.2 % (60d); supply-shock regime detected by ChaosEngine</div>
+      <div class="reason"><b>NVDA</b> — highest pred. Sharpe 2.41; AI-demand backcast analogue positive 78 % of windows</div>
+      <div class="reason"><b>HOUSING</b> — rate-sensitive but low correlation to equity bloc (ρ = 0.18); diversification gain</div>
+      <div class="lbl">rejected runners-up</div>
+      <div class="rej"><b>SILVER</b> · QUBO energy gap +0.103 — high vol relative to gold factor loading</div>
+      <div class="rej"><b>HOMEBUILDERS</b> · rate sensitivity ↑; momentum break signal detected</div>
+      <div class="lbl">key signals</div>
+      <div class="sigs">
+        <div class="sig"><div class="k">dominant factor var (ann.)</div><div class="v">0.2697</div></div>
+        <div class="sig"><div class="k">portfolio vol (ann.)</div><div class="v">18.4 %</div></div>
+        <div class="sig"><div class="k">QUBO ground energy</div><div class="v">−2.834</div></div>
+        <div class="sig"><div class="k">subsets evaluated</div><div class="v">495</div></div>
+      </div>
+      <div class="lbl">caveats</div>
+      <div class="cav">⚠ Commodity futures carry roll-yield drag not captured in price-return backtest</div>
+      <div class="cav">⚠ HOUSING (VNQ) is rate-sensitive; monitor Fed pivot signals</div>
+    </div>
+
+    <!-- ML Agent -->
+    <div class="card ml">
+      <div class="chead">
+        <div class="ctitle"><span class="dot"></span>MLAgent</div>
+        <span class="badge live m-live">momentum model</span>
+      </div>
+      <div class="gauge">
+        <div class="ring" style="background:conic-gradient(var(--ml) 270deg,#1d2536 0)">
+          <div style="width:40px;height:40px;border-radius:50%;background:var(--panel);
+            display:grid;place-items:center">75</div>
+        </div>
+        <div>
+          <div class="lbl" style="margin:0">confidence</div>
+          <div style="font-size:13px;color:var(--mut)">Cross-asset momentum confirms
+            commodity up-cycle; real estate lagging equity recovery</div>
+        </div>
+      </div>
+      <div class="lbl">selected basket (K = 4)</div>
+      <div class="chips">
+        <span class="chip">GOLD</span>
+        <span class="chip">OIL</span>
+        <span class="chip">NVDA</span>
+        <span class="chip">RESIDENTIAL</span>
+      </div>
+      <div class="lbl">per-ticker reasoning</div>
+      <div class="reason"><b>GOLD</b> — 60d momentum +9.1 %; Two Curves: Second Curve ↗; lower drawdown risk</div>
+      <div class="reason"><b>OIL</b> — pred. Sharpe 1.87; vol-adjusted return ranks 2nd across universe</div>
+      <div class="reason"><b>NVDA</b> — 20d momentum +28.4 %; beta to equal-weight 1.14 — acceptable</div>
+      <div class="reason"><b>RESIDENTIAL</b> — second-curve emerging vs. HOUSING (broader); lower rate exposure</div>
+      <div class="lbl">rejected runners-up</div>
+      <div class="rej"><b>HOUSING</b> · replaced by RESIDENTIAL — higher drawdown (−7.2 % 60d)</div>
+      <div class="rej"><b>PALLADIUM</b> · vol 39.7 % annualised — too high relative to Sharpe</div>
+      <div class="lbl">ML feature table</div>
+      <table style="margin-top:6px">
+        <thead><tr><th>ticker</th><th>cls</th><th>mom20</th><th>vol20</th><th>maxDD60</th><th>predSharpe</th></tr></thead>
+        <tbody>
+          <tr style="color:var(--ml);font-weight:700"><td>GOLD ✓</td><td><span class="cls-cmd">CMD</span></td><td>+9.1%</td><td>12.3%</td><td>−4.1%</td><td>1.94</td></tr>
+          <tr style="color:var(--ml);font-weight:700"><td>OIL ✓</td><td><span class="cls-cmd">CMD</span></td><td>+7.8%</td><td>19.4%</td><td>−6.2%</td><td>1.87</td></tr>
+          <tr style="color:var(--ml);font-weight:700"><td>NVDA ✓</td><td><span class="cls-eq">EQ</span></td><td>+28.4%</td><td>32.1%</td><td>−8.9%</td><td>2.41</td></tr>
+          <tr style="color:var(--ml);font-weight:700"><td>RESIDENTIAL ✓</td><td><span class="cls-re">RE</span></td><td>+4.2%</td><td>13.8%</td><td>−5.1%</td><td>1.31</td></tr>
+          <tr><td>SILVER</td><td><span class="cls-cmd">CMD</span></td><td>+5.6%</td><td>21.7%</td><td>−9.4%</td><td>1.22</td></tr>
+          <tr><td>HOUSING</td><td><span class="cls-re">RE</span></td><td>+3.9%</td><td>13.2%</td><td>−7.2%</td><td>1.19</td></tr>
+          <tr><td>PALLADIUM</td><td><span class="cls-cmd">CMD</span></td><td>+2.1%</td><td>39.7%</td><td>−14.8%</td><td>0.71</td></tr>
+          <tr><td>GOOG</td><td><span class="cls-eq">EQ</span></td><td>+11.2%</td><td>21.4%</td><td>−6.4%</td><td>1.48</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div><!-- /cards -->
+
+  <!-- ===== MetaAgent ===== -->
+  <div style="height:16px"></div>
+  <div class="card full x">
+    <div class="chead">
+      <div class="ctitle"><span class="dot"></span>MetaAgent</div>
+      <span class="badge live x-live">Claude claude-opus-4</span>
+    </div>
+    <div class="meta-grid">
+      <div class="seen">
+        <div class="lbl" style="margin-top:0">what it sees</div>
+        <div class="reason"><b>QuantumAgent</b> → GOLD, OIL, NVDA, HOUSING <span style="color:var(--mut)">(conf 0.84)</span></div>
+        <div class="reason"><b>MLAgent</b> → GOLD, OIL, NVDA, RESIDENTIAL <span style="color:var(--mut)">(conf 0.75)</span></div>
+        <div class="reason" style="margin-top:8px"><b>vol regime</b> elevated (1.41×) · <b>20d univ. return</b> +4.2 %</div>
+        <div class="lbl">decision</div>
+        <div class="reason">picks <b style="color:var(--meta)">quantum</b> → GOLD, OIL, NVDA, HOUSING</div>
+        <div class="reason" style="color:var(--mut);margin-top:6px">Both agents agree on 3 of 4 tickers.
+          HOUSING preferred over RESIDENTIAL: broader REIT ETF provides more rate-beta
+          diversification when ChaosEngine signals elevated crash probability (0.60).</div>
+      </div>
+      <div class="think">
+        <div class="lbl" style="margin-top:0;color:var(--meta)">what it thinks</div>
+        <div class="r">Both agents converge on GOLD + OIL as the commodity core — this agreement in a
+          multi-asset universe is a strong confirmation signal. The 60-day commodity factor backcast
+          shows 71 % positive-return analogues, distinctly better than the real-estate bloc (34 %).
+          I favour HOUSING over RESIDENTIAL because the ChaosEngine's elevated crash probability
+          (0.60) makes the broader, lower-vol REIT a safer anchor than the sector-specific RESIDENTIAL ETF.
+          NVDA remains the sole equity exposure — the AI-demand second-curve is still emerging
+          and the pred. Sharpe (2.41) is the highest in the universe. Position sizes should
+          reflect the elevated vol regime: reduce commodity weights slightly vs. a normal
+          environment.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Crystal Ball ===== -->
+  <div style="height:16px"></div>
+  <div class="card full cb-card" id="crystal_ball">
+    <div class="chead">
+      <div class="ctitle" style="color:var(--accent)">
+        <span class="dot" style="background:var(--accent)"></span>Crystal Ball — 1-Year Scenario Forecast
+      </div>
+      <span class="badge live a-live">xpyq eigendecomposition</span>
+    </div>
+    <div class="reason" style="color:var(--mut);margin-bottom:4px">
+      IFTF Futures Thinking framework · Principles 2 (signals) · 3 (backcasting) · 4 (Two Curves)
+      · Per-asset-class thresholds · Dominant factor variance 0.2697
+    </div>
+
+    <!-- Chaos signal summary -->
+    <div class="stat" style="margin:12px 0">
+      <div class="box">
+        <div class="v" style="color:var(--bad)">60 %</div>
+        <div class="k">crash probability</div>
+      </div>
+      <div class="box">
+        <div class="v" style="color:var(--meta)">CAUTION</div>
+        <div class="k">risk regime</div>
+      </div>
+      <div class="box">
+        <div class="v" style="color:var(--accent)">252 d</div>
+        <div class="k">horizon</div>
+      </div>
+    </div>
+    <div class="crash-prob-bar">
+      <span style="width:60%;background:linear-gradient(90deg,var(--good),var(--meta),var(--bad))"></span>
+    </div>
+
+    <!-- tab bar -->
+    <div style="display:flex;gap:6px;margin:14px 0 10px;flex-wrap:wrap">
+      <button class="run alt cb-tab active" id="tab_signals" style="border-color:var(--accent);color:var(--accent)">
+        ◎ Signals (P2)
+      </button>
+      <button class="run alt cb-tab" id="tab_backcast">📅 Backcasting (P3)</button>
+      <button class="run alt cb-tab" id="tab_curves">〜 Two Curves (P4)</button>
+      <button class="run alt cb-tab" id="tab_scenarios">📊 Scenarios</button>
+      <button class="run alt cb-tab" id="tab_reasoning">📄 Full Reasoning</button>
+    </div>
+
+    <!-- === SIGNALS panel === -->
+    <div id="panel_signals">
+      <div style="font-size:12px;color:var(--mut);margin-bottom:10px">
+        Anomalous deviations from each ticker's own baseline — not predictions, but signals that warrant attention.
+        Thresholds are calibrated per asset class (commodities use 2.2× vol-surge threshold; real estate 1.7×).
+      </div>
+      <!-- Equities -->
+      <div class="cb-section">
+        <h5>Equities <span class="cls-eq">EQ</span></h5>
+        <div class="cb-ticker-row">
+          <div style="width:90px;font-weight:700">NVDA</div>
+          <div><span class="signal-tag ok">no anomalous signals</span></div>
+        </div>
+        <div class="cb-ticker-row">
+          <div style="width:90px;font-weight:700">GOOG</div>
+          <div><span class="signal-tag ok">no anomalous signals</span></div>
+        </div>
+      </div>
+      <!-- Commodities -->
+      <div class="cb-section">
+        <h5>Commodities <span class="cls-cmd">CMD</span> <span style="color:var(--mut);font-size:11px">— vol-surge threshold 2.2× | drawdown floor −12 %</span></h5>
+        <div class="cb-ticker-row">
+          <div style="width:90px;font-weight:700">GOLD</div>
+          <div>
+            <span class="signal-tag warn">counter-trend bounce — short-term recovery within a longer downtrend</span>
+          </div>
+        </div>
+        <div class="cb-ticker-row">
+          <div style="width:90px;font-weight:700">SILVER</div>
+          <div>
+            <span class="signal-tag warn">counter-trend bounce — short-term recovery within a longer downtrend</span>
+          </div>
+        </div>
+        <div class="cb-ticker-row">
+          <div style="width:90px;font-weight:700">PLATINUM</div>
+          <div><span class="signal-tag warn">counter-trend bounce</span></div>
+        </div>
+        <div class="cb-ticker-row">
+          <div style="width:90px;font-weight:700">PALLADIUM</div>
+          <div><span class="signal-tag ok">no anomalous signals</span></div>
+        </div>
+        <div class="cb-ticker-row">
+          <div style="width:90px;font-weight:700">OIL</div>
+          <div>
+            <span class="signal-tag bad">volatility surge (5d/60d ratio 2.6×, threshold 2.2× for commodity)</span>
+          </div>
+        </div>
+      </div>
+      <!-- Real Estate -->
+      <div class="cb-section">
+        <h5>Real Estate <span class="cls-re">RE</span> <span style="color:var(--mut);font-size:11px">— vol-surge threshold 1.7× | drawdown floor −7 %</span></h5>
+        <div class="cb-ticker-row">
+          <div style="width:110px;font-weight:700">HOUSING</div>
+          <div><span class="signal-tag ok">no anomalous signals</span></div>
+        </div>
+        <div class="cb-ticker-row">
+          <div style="width:110px;font-weight:700">HOMEBUILDERS</div>
+          <div><span class="signal-tag bad">drawdown warning (−8.4 % from 60d peak, threshold −7 % for real_estate)</span></div>
+        </div>
+        <div class="cb-ticker-row">
+          <div style="width:110px;font-weight:700">MORTGAGES</div>
+          <div><span class="signal-tag warn">counter-trend bounce</span></div>
+        </div>
+        <div class="cb-ticker-row">
+          <div style="width:110px;font-weight:700">COMMERCIAL_RE</div>
+          <div><span class="signal-tag warn">counter-trend bounce</span></div>
+        </div>
+        <div class="cb-ticker-row">
+          <div style="width:110px;font-weight:700">RESIDENTIAL</div>
+          <div><span class="signal-tag warn">counter-trend bounce</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- === BACKCASTING panel (hidden) === -->
+    <div id="panel_backcast" style="display:none">
+      <div style="font-size:12px;color:var(--mut);margin-bottom:10px">
+        Historical analogues: windows whose volatility regime (±25 %) matches the current one.
+        Run independently per asset class to avoid conflating equity / commodity / real-estate regimes.
+      </div>
+      <div class="cb-section">
+        <h5>Equities <span class="cls-eq">EQ</span></h5>
+        <div class="sigs">
+          <div class="sig"><div class="k">analogous windows</div><div class="v">2</div></div>
+          <div class="sig"><div class="k">median 10d fwd return</div><div class="v" style="color:var(--good)">+13.4 %</div></div>
+          <div class="sig"><div class="k">historically positive</div><div class="v" style="color:var(--good)">100 %</div></div>
+          <div class="sig"><div class="k">regime</div><div class="v" style="font-size:13px">typical vol</div></div>
+        </div>
+      </div>
+      <div class="cb-section">
+        <h5>Commodities <span class="cls-cmd">CMD</span></h5>
+        <div class="sigs">
+          <div class="sig"><div class="k">analogous windows</div><div class="v">7</div></div>
+          <div class="sig"><div class="k">median 10d fwd return</div><div class="v" style="color:var(--bad)">−1.7 %</div></div>
+          <div class="sig"><div class="k">historically positive</div><div class="v" style="color:var(--bad)">43 %</div></div>
+          <div class="sig"><div class="k">regime</div><div class="v" style="font-size:13px">typical vol</div></div>
+        </div>
+        <div class="cav" style="margin-top:8px">⚠ Below-average positivity rate for commodities — consistent with counter-trend-bounce signals above</div>
+      </div>
+      <div class="cb-section">
+        <h5>Real Estate <span class="cls-re">RE</span></h5>
+        <div class="sigs">
+          <div class="sig"><div class="k">analogous windows</div><div class="v">29</div></div>
+          <div class="sig"><div class="k">median 10d fwd return</div><div class="v" style="color:var(--bad)">−0.8 %</div></div>
+          <div class="sig"><div class="k">historically positive</div><div class="v" style="color:var(--bad)">34 %</div></div>
+          <div class="sig"><div class="k">regime</div><div class="v" style="font-size:13px">typical vol</div></div>
+        </div>
+        <div class="cav" style="margin-top:8px">⚠ 34 % positive — real estate historically soft in this vol regime; rate environment a factor</div>
+      </div>
+    </div>
+
+    <!-- === TWO CURVES panel (hidden) === -->
+    <div id="panel_curves" style="display:none">
+      <div style="font-size:12px;color:var(--mut);margin-bottom:10px">
+        IFTF Principle 4. Momentum thresholds are wider for commodities (±5 %/±2 %)
+        to avoid classifying ordinary commodity noise as a curve transition.
+      </div>
+      <div class="cb-section">
+        <h5>Equities</h5>
+        <div class="cb-ticker-row">
+          <div style="width:90px;font-weight:700">NVDA</div>
+          <span class="curve-tag curve-asc">First Curve ↑ (established uptrend)</span>
+        </div>
+        <div class="cb-ticker-row">
+          <div style="width:90px;font-weight:700">GOOG</div>
+          <span class="curve-tag curve-asc">First Curve ↑ (established uptrend)</span>
+        </div>
+      </div>
+      <div class="cb-section">
+        <h5>Commodities <span style="color:var(--mut);font-size:11px">— thresholds ±5 %/±2 %</span></h5>
+        <div class="cb-ticker-row">
+          <div style="width:90px;font-weight:700">GOLD</div>
+          <span class="curve-tag curve-emerge">Second Curve ↗ (nascent trend emerging from prior decline)</span>
+        </div>
+        <div class="cb-ticker-row">
+          <div style="width:90px;font-weight:700">SILVER</div>
+          <span class="curve-tag curve-trans">Transition (between curves — signals mixed)</span>
+        </div>
+        <div class="cb-ticker-row">
+          <div style="width:90px;font-weight:700">PLATINUM</div>
+          <span class="curve-tag curve-trans">Transition</span>
+        </div>
+        <div class="cb-ticker-row">
+          <div style="width:90px;font-weight:700">PALLADIUM</div>
+          <span class="curve-tag curve-asc">First Curve ↑ (established uptrend)</span>
+        </div>
+        <div class="cb-ticker-row">
+          <div style="width:90px;font-weight:700">OIL</div>
+          <span class="curve-tag curve-asc">First Curve ↑ (established uptrend)</span>
+        </div>
+      </div>
+      <div class="cb-section">
+        <h5>Real Estate</h5>
+        <div class="cb-ticker-row">
+          <div style="width:110px;font-weight:700">HOUSING</div>
+          <span class="curve-tag curve-trans">Transition</span>
+        </div>
+        <div class="cb-ticker-row">
+          <div style="width:110px;font-weight:700">HOMEBUILDERS</div>
+          <span class="curve-tag curve-trans">Transition</span>
+        </div>
+        <div class="cb-ticker-row">
+          <div style="width:110px;font-weight:700">MORTGAGES</div>
+          <span class="curve-tag curve-emerge">Second Curve ↗</span>
+        </div>
+        <div class="cb-ticker-row">
+          <div style="width:110px;font-weight:700">COMMERCIAL_RE</div>
+          <span class="curve-tag curve-emerge">Second Curve ↗</span>
+        </div>
+        <div class="cb-ticker-row">
+          <div style="width:110px;font-weight:700">RESIDENTIAL</div>
+          <span class="curve-tag curve-emerge">Second Curve ↗</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- === SCENARIOS panel (hidden) === -->
+    <div id="panel_scenarios" style="display:none">
+      <div style="font-size:12px;color:var(--mut);margin-bottom:10px">
+        Base: short-horizon expected return compounded to 1 year.
+        Bull/Bear: base ± 1.5 × annual vol (from xpyq eigendecomposition of the covariance matrix).
+        Crash-adj: base × ChaosEngine per-ticker weight multiplier.
+      </div>
+      <!-- Equities -->
+      <div class="cb-section">
+        <h5>Equities</h5>
+        <div class="cb-ticker-row" style="display:block">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="width:90px;font-weight:700">NVDA</span>
+            <span class="cls-eq">EQ</span>
+            <span style="color:var(--mut);font-size:11px">ann. vol 39.3 %</span>
+          </div>
+          <div class="scenario-grid">
+            <div class="sc-box base"><div class="sv">+181.5 %</div><div class="sk">base</div></div>
+            <div class="sc-box bull"><div class="sv">+240.5 %</div><div class="sk">bull</div></div>
+            <div class="sc-box bear"><div class="sv">+122.4 %</div><div class="sk">bear</div></div>
+            <div class="sc-box crash"><div class="sv">+72.6 %</div><div class="sk">crash-adj</div></div>
+          </div>
+        </div>
+        <div class="cb-ticker-row" style="display:block">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="width:90px;font-weight:700">GOOG</span>
+            <span class="cls-eq">EQ</span>
+            <span style="color:var(--mut);font-size:11px">ann. vol 25.3 %</span>
+          </div>
+          <div class="scenario-grid">
+            <div class="sc-box base"><div class="sv">+104.8 %</div><div class="sk">base</div></div>
+            <div class="sc-box bull"><div class="sv">+142.7 %</div><div class="sk">bull</div></div>
+            <div class="sc-box bear"><div class="sv">+66.8 %</div><div class="sk">bear</div></div>
+            <div class="sc-box crash"><div class="sv">+41.9 %</div><div class="sk">crash-adj</div></div>
+          </div>
+        </div>
+      </div>
+      <!-- Commodities -->
+      <div class="cb-section">
+        <h5>Commodities</h5>
+        <div class="cb-ticker-row" style="display:block">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="width:90px;font-weight:700">GOLD</span>
+            <span class="cls-cmd">CMD</span>
+            <span style="color:var(--mut);font-size:11px">ann. vol 18.0 %</span>
+          </div>
+          <div class="scenario-grid">
+            <div class="sc-box base"><div class="sv">+29.4 %</div><div class="sk">base</div></div>
+            <div class="sc-box bull"><div class="sv">+56.4 %</div><div class="sk">bull</div></div>
+            <div class="sc-box bear"><div class="sv">+2.3 %</div><div class="sk">bear</div></div>
+            <div class="sc-box crash"><div class="sv">+11.7 %</div><div class="sk">crash-adj</div></div>
+          </div>
+        </div>
+        <div class="cb-ticker-row" style="display:block">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="width:90px;font-weight:700">OIL</span>
+            <span class="cls-cmd">CMD</span>
+            <span style="color:var(--mut);font-size:11px">ann. vol 32.1 %</span>
+          </div>
+          <div class="scenario-grid">
+            <div class="sc-box base"><div class="sv">+32.0 %</div><div class="sk">base</div></div>
+            <div class="sc-box bull"><div class="sv">+80.2 %</div><div class="sk">bull</div></div>
+            <div class="sc-box bear"><div class="sv">−16.2 %</div><div class="sk">bear</div></div>
+            <div class="sc-box crash"><div class="sv">+12.8 %</div><div class="sk">crash-adj</div></div>
+          </div>
+        </div>
+        <div class="cb-ticker-row" style="display:block">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="width:90px;font-weight:700">PALLADIUM</span>
+            <span class="cls-cmd">CMD</span>
+            <span style="color:var(--mut);font-size:11px">ann. vol 39.7 %</span>
+          </div>
+          <div class="scenario-grid">
+            <div class="sc-box base"><div class="sv">+217.2 %</div><div class="sk">base</div></div>
+            <div class="sc-box bull"><div class="sv">+276.8 %</div><div class="sk">bull</div></div>
+            <div class="sc-box bear"><div class="sv">+157.7 %</div><div class="sk">bear</div></div>
+            <div class="sc-box crash"><div class="sv">+86.9 %</div><div class="sk">crash-adj</div></div>
+          </div>
+        </div>
+      </div>
+      <!-- Real Estate -->
+      <div class="cb-section">
+        <h5>Real Estate</h5>
+        <div class="cb-ticker-row" style="display:block">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="width:110px;font-weight:700">HOUSING</span>
+            <span class="cls-re">RE</span>
+            <span style="color:var(--mut);font-size:11px">ann. vol 18.0 %</span>
+          </div>
+          <div class="scenario-grid">
+            <div class="sc-box base"><div class="sv">+55.6 %</div><div class="sk">base</div></div>
+            <div class="sc-box bull"><div class="sv">+82.6 %</div><div class="sk">bull</div></div>
+            <div class="sc-box bear"><div class="sv">+28.6 %</div><div class="sk">bear</div></div>
+            <div class="sc-box crash"><div class="sv">+22.2 %</div><div class="sk">crash-adj</div></div>
+          </div>
+        </div>
+        <div class="cb-ticker-row" style="display:block">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="width:110px;font-weight:700">RESIDENTIAL</span>
+            <span class="cls-re">RE</span>
+            <span style="color:var(--mut);font-size:11px">ann. vol 18.1 %</span>
+          </div>
+          <div class="scenario-grid">
+            <div class="sc-box base"><div class="sv">+24.1 %</div><div class="sk">base</div></div>
+            <div class="sc-box bull"><div class="sv">+51.3 %</div><div class="sk">bull</div></div>
+            <div class="sc-box bear"><div class="sv">−3.1 %</div><div class="sk">bear</div></div>
+            <div class="sc-box crash"><div class="sv">+9.6 %</div><div class="sk">crash-adj</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- === REASONING panel (hidden) === -->
+    <div id="panel_reasoning" style="display:none">
+      <pre>CrystalBall [2026-05-29] — 1-YEAR OUTLOOK (252 trading days)
+
+── PRINCIPLE 2: FORWARD-LOOKING SIGNALS ─────────────────────────────
+  (Signals are anomalous deviations that may indicate future discontinuities,
+   not predictions. Future data does not exist; only signals do.)
+  [EQUITIES]
+    NVDA    : no anomalous signals
+    GOOG    : no anomalous signals
+  [COMMODITIES]
+    GOLD    : counter-trend bounce (short-term recovery within a longer downtrend)
+    SILVER  : counter-trend bounce (short-term recovery within a longer downtrend)
+    PLATINUM: counter-trend bounce (short-term recovery within a longer downtrend)
+    PALLADIUM: no anomalous signals
+    OIL     : volatility surge (5d/60d vol ratio 2.6×, threshold 2.2× for commodity)
+  [REAL ESTATE]
+    HOUSING    : no anomalous signals
+    HOMEBUILDERS: drawdown warning (−8.4% from 60d peak, threshold −7% for real_estate)
+    MORTGAGES  : counter-trend bounce (short-term recovery within a longer downtrend)
+    COMMERCIAL_RE: counter-trend bounce (short-term recovery within a longer downtrend)
+    RESIDENTIAL: counter-trend bounce (short-term recovery within a longer downtrend)
+
+── PRINCIPLE 3: LOOK BACK TO SEE FORWARD (BACKCASTING) ──────────────
+  (Historical analogues reveal recurrent patterns, not repetitions.)
+  [EQUITIES]
+    Analogous historical regimes : 2
+    Median forward return        : +13.39%  (next 10 days across all analogues)
+    Historically positive        : 100% of analogues
+    Current regime pattern       : typical volatility
+  [COMMODITIES]
+    Analogous historical regimes : 7
+    Median forward return        : -1.69%  (next 10 days across all analogues)
+    Historically positive        : 43% of analogues
+    Current regime pattern       : typical volatility
+  [REAL ESTATE]
+    Analogous historical regimes : 29
+    Median forward return        : -0.82%  (next 10 days across all analogues)
+    Historically positive        : 34% of analogues
+    Current regime pattern       : typical volatility
+
+── PRINCIPLE 4: TWO CURVES PATTERN FRAMEWORK ────────────────────────
+  (First curve = established trend; Second curve = nascent emergence.
+   The inflection between them is where futures thinking adds most value.)
+  Dominant market factor variance (annualised): 0.2697
+  [EQUITIES]
+    NVDA    : First Curve ↑  (established uptrend)
+    GOOG    : First Curve ↑  (established uptrend)
+  [COMMODITIES]
+    GOLD    : Second Curve ↗ (nascent trend emerging from prior decline)
+    SILVER  : Transition     (between curves — signals mixed)
+    PLATINUM: Transition     (between curves — signals mixed)
+    PALLADIUM: First Curve ↑  (established uptrend)
+    OIL     : First Curve ↑  (established uptrend)
+  [REAL ESTATE]
+    HOUSING    : Transition     (between curves — signals mixed)
+    HOMEBUILDERS: Transition     (between curves — signals mixed)
+    MORTGAGES  : Second Curve ↗ (nascent trend emerging from prior decline)
+    COMMERCIAL_RE: Second Curve ↗ (nascent trend emerging from prior decline)
+    RESIDENTIAL: Second Curve ↗ (nascent trend emerging from prior decline)
+
+── SCENARIO PROJECTIONS ──────────────────────────────────────────────
+  Risk regime      : CAUTION
+  Crash probability: 0.602
+  [EQUITIES]
+    NVDA      base: +181.5%  bull: +240.5%  bear: +122.4%  vol: 39.3%  crash-adj: +72.6%
+    GOOG      base: +104.8%  bull: +142.7%  bear:  +66.8%  vol: 25.3%  crash-adj: +41.9%
+  [COMMODITIES]
+    GOLD      base:  +29.4%  bull:  +56.4%  bear:   +2.3%  vol: 18.0%  crash-adj: +11.7%
+    SILVER    base:  +33.6%  bull:  +77.8%  bear:  -10.6%  vol: 29.5%  crash-adj: +13.4%
+    PLATINUM  base:  +86.3%  bull: +120.3%  bear:  +52.2%  vol: 22.7%  crash-adj: +34.5%
+    PALLADIUM base: +217.2%  bull: +276.8%  bear: +157.7%  vol: 39.7%  crash-adj: +86.9%
+    OIL       base:  +32.0%  bull:  +80.2%  bear:  -16.2%  vol: 32.1%  crash-adj: +12.8%
+  [REAL ESTATE]
+    HOUSING      base: +55.6%  bull:  +82.6%  bear: +28.6%  vol: 18.0%  crash-adj: +22.2%
+    HOMEBUILDERS base: +19.3%  bull:  +57.0%  bear: -18.5%  vol: 25.2%  crash-adj:  +7.7%
+    MORTGAGES    base:+178.8%  bull: +211.5%  bear:+146.1%  vol: 21.8%  crash-adj: +71.5%
+    COMMERCIAL_RE base: +55.1% bull:  +84.3%  bear: +25.9%  vol: 19.5%  crash-adj: +22.1%
+    RESIDENTIAL  base: +24.1%  bull:  +51.3%  bear:  -3.1%  vol: 18.1%  crash-adj:  +9.6%</pre>
+    </div>
+  </div><!-- /crystal ball -->
+
+  <!-- ===== Performance ===== -->
+  <div style="height:16px"></div>
+  <div class="card full" id="perf_card">
+    <div class="ctitle" style="margin-bottom:10px">Realized performance — MetaAgent choice</div>
+    <div class="stat">
+      <div class="box"><div class="v" style="color:var(--meta)">+47.2 %</div><div class="k">realized return</div></div>
+      <div class="box"><div class="v">21.4 %</div><div class="k">volatility (ann.)</div></div>
+      <div class="box"><div class="v" style="color:var(--good)">1.83</div><div class="k">sharpe (ann.)</div></div>
+    </div>
+    <table style="margin-top:12px">
+      <thead><tr><th>rebalance</th><th>quantum</th><th>ml</th><th>meta choice</th><th>fell back</th><th>realized sharpe</th><th></th></tr></thead>
+      <tbody id="perf_rows">
+        <!-- filled by JS -->
+      </tbody>
+    </table>
+    <div class="reason" style="margin-top:10px;color:var(--mut)">
+      Driven by → <b>quantum</b> 62 % · <b>ml</b> 22 % · <b>blend</b> 16 % &nbsp;·&nbsp;
+      cumulative mean Sharpe <b style="color:var(--meta)">1.83</b>
+    </div>
+  </div>
+
+  <!-- ===== Universe snapshot ===== -->
+  <div style="height:16px"></div>
+  <div class="card full" id="univ_card">
+    <div class="ctitle" style="margin-bottom:6px">Universe snapshot (final rebalance)</div>
+    <table>
+      <thead><tr><th>ticker</th><th>asset class</th><th>expected return (ann.)</th><th></th><th style="text-align:right">vol</th><th>selected by</th></tr></thead>
+      <tbody id="univ_rows"></tbody>
+    </table>
+  </div>
+
+  <div style="height:32px"></div>
+</main>
+</div>
+
+<script>
+// ─── sidebar sliders ───────────────────────────────────────────────────────────
+const bind=(id,out,f=x=>x)=>{
+  const e=document.getElementById(id);
+  const u=()=>document.getElementById(out).textContent=f(e.value);
+  e.addEventListener('input',u); u();
+};
+bind('K','Kv');
+bind('lam','lamv',v=>Number(v).toFixed(1));
+bind('reb','rebv');
+bind('lb','lbv');
+bind('hp','hpv');
+bind('vs','vsv',v=>Number(v).toFixed(1));
+bind('dd','ddv');
+
+// ─── ticker buttons ──────────────────────────────────────────────────────────
+const EQUITIES=["NVDA","GOOG","AAPL","MSFT","AMZN","META","TSLA","AMD","NFLX","INTC"];
+const COMMODITIES=["GOLD","SILVER","PLATINUM","PALLADIUM","OIL"];
+const HOUSING=["HOUSING","HOMEBUILDERS","MORTGAGES","COMMERCIAL_RE","RESIDENTIAL"];
+const EQ_ON=new Set(["NVDA","GOOG"]);
+const CMD_ON=new Set(["GOLD","OIL"]);
+const RE_ON=new Set(["HOUSING","RESIDENTIAL"]);
+
+function mkBtn(t, cls, on){
+  const b=document.createElement('button');
+  b.className='tkbtn '+cls+(on?' on':'');
+  b.dataset.t=t; b.textContent=t;
+  b.title={eq:'Equity',cmd:'Commodity (futures)',re:'Real Estate ETF'}[cls]||'';
+  b.onclick=()=>b.classList.toggle('on');
+  return b;
+}
+const tk=document.getElementById('tk_btns');
+const cm=document.getElementById('cm_btns');
+const re=document.getElementById('re_btns');
+EQUITIES.forEach(t=>tk.appendChild(mkBtn(t,'eq',EQ_ON.has(t))));
+COMMODITIES.forEach(t=>cm.appendChild(mkBtn(t,'cmd',CMD_ON.has(t))));
+HOUSING.forEach(t=>re.appendChild(mkBtn(t,'re',RE_ON.has(t))));
+
+// ─── Lab buttons ─────────────────────────────────────────────────────────────
+const MOCK_RESULTS={
+  xpyq:{
+    tickers:['GOLD','OIL','NVDA','HOUSING'],
+    energy:-2.8341, energy_gap:0.1027, runner_up:['SILVER','HOMEBUILDERS'],
+    backend:'xpyq hardware', N:12, K:4, subsets:495, credits:3, duration:'1 420 ms', penalty:'2.417',
+    badgeLabel:'xpyq completed ✓', badgeClass:'q-live',
+  },
+  sim:{
+    tickers:['GOLD','OIL','NVDA','RESIDENTIAL'],
+    energy:-2.7810, energy_gap:0.0882, runner_up:['HOUSING','GOOG'],
+    backend:'Aer simulator (QAOA p=1)', N:12, K:4, subsets:'—', credits:'—', duration:'840 ms', penalty:'2.417',
+    badgeLabel:'simulator ✓', badgeClass:'a-live',
+    counts:[{bits:'101001000010',n:312},{bits:'101000010010',n:184},{bits:'100001000110',n:97},{bits:'001001000110',n:42}],
+  },
+  local:{
+    tickers:['GOLD','OIL','NVDA','HOUSING'],
+    energy:-2.8341, energy_gap:0.1027, runner_up:['SILVER','HOMEBUILDERS'],
+    backend:'local brute force', N:12, K:4, subsets:495, credits:'—', duration:'112 ms', penalty:'2.417',
+    badgeLabel:'local ✓', badgeClass:'m-live',
+  },
+  ibm:{
+    tickers:['GOLD','OIL','GOOG','HOUSING'],
+    energy:-2.6990, energy_gap:0.2410, runner_up:['NVDA','RESIDENTIAL'],
+    backend:'IBM ibm_brisbane', N:12, K:4, subsets:'—', credits:'—', duration:'4 320 ms', penalty:'2.417',
+    badgeLabel:'IBM done ✓', badgeClass:'ibm-on',
+    counts:[{bits:'101001000010',n:289},{bits:'100001000110',n:201},{bits:'101000010010',n:158},{bits:'001001000110',n:88}],
+  },
+};
+
+function renderLabResult(key){
+  const r=MOCK_RESULTS[key];
+  const badge=document.getElementById('lab_badge');
+  badge.textContent=r.badgeLabel; badge.className='badge live '+r.badgeClass;
+  const chips=r.tickers.map(t=>`<span class="chip" style="border-color:var(--quantum);color:var(--quantum)">${t}</span>`).join('');
+  const counts=r.counts?`
+    <div class="lbl">measurement distribution (top bitstrings)</div>
+    <div style="display:flex;flex-direction:column;gap:3px;margin-top:4px">
+      ${r.counts.map(c=>{
+        const mx=Math.max(...r.counts.map(x=>x.n));
+        return `<div style="display:flex;align-items:center;gap:8px;font-size:11px;color:var(--mut)">
+          <span style="font-family:monospace;width:100px">${c.bits}</span>
+          <span style="flex:1"><div class="bar"><span style="width:${(c.n/mx*100).toFixed(0)}%;background:var(--quantum)"></span></div></span>
+          <span>${c.n}</span></div>`;
+      }).join('')}
+    </div>`:''
+  ;
+  document.getElementById('lab_result').innerHTML=`
+    <div class="lbl" style="margin-top:0">solved on <b style="color:var(--quantum)">${r.backend}</b></div>
+    <div class="chips">${chips}</div>
+    <div class="reason">ground-state energy x'Qx = <b>${r.energy.toFixed(4)}</b></div>
+    <div class="rej">runner-up: ${r.runner_up.join(', ')} · ΔE = ${r.energy_gap.toFixed(4)}</div>
+    <div class="sigs" style="margin-top:10px">
+      <div class="sig"><div class="k">backend</div><div class="v" style="font-size:13px">${r.backend}</div></div>
+      <div class="sig"><div class="k">N / K</div><div class="v" style="font-size:13px">${r.N} / ${r.K}</div></div>
+      <div class="sig"><div class="k">subsets evaluated</div><div class="v" style="font-size:13px">${r.subsets}</div></div>
+      <div class="sig"><div class="k">credits used</div><div class="v" style="font-size:13px">${r.credits}</div></div>
+      <div class="sig"><div class="k">duration</div><div class="v" style="font-size:13px">${r.duration}</div></div>
+      <div class="sig"><div class="k">penalty P</div><div class="v" style="font-size:13px">${r.penalty}</div></div>
+    </div>${counts}`;
+}
+
+document.getElementById('btn_xpyq').onclick=()=>renderLabResult('xpyq');
+document.getElementById('btn_sim').onclick=()=>renderLabResult('sim');
+document.getElementById('btn_ibm').onclick=()=>renderLabResult('ibm');
+document.getElementById('btn_local').onclick=()=>renderLabResult('local');
+
+// ─── Crystal Ball tabs ────────────────────────────────────────────────────────
+const TABS=['signals','backcast','curves','scenarios','reasoning'];
+TABS.forEach(name=>{
+  const btn=document.getElementById('tab_'+name);
+  const panel=document.getElementById('panel_'+name);
+  btn.addEventListener('click',()=>{
+    TABS.forEach(n=>{
+      document.getElementById('panel_'+n).style.display='none';
+      const b=document.getElementById('tab_'+n);
+      b.style.borderColor=''; b.style.color='';
+    });
+    panel.style.display='';
+    btn.style.borderColor='var(--accent)'; btn.style.color='var(--accent)';
+  });
+});
+
+// ─── Run pipeline button ──────────────────────────────────────────────────────
+document.getElementById('run_btn').addEventListener('click',function(){
+  const btn=this; btn.disabled=true;
+  const orig=btn.innerHTML;
+  btn.innerHTML='<span style="display:inline-block;width:14px;height:14px;border:2px solid #ffffff33;border-top-color:var(--accent);border-radius:50%;animation:s .7s linear infinite;vertical-align:-2px"></span> running…';
+  // Show loading state, then reveal results after 1.8 s
+  document.getElementById('perf_rows').innerHTML='<tr><td colspan="7" style="color:var(--mut);text-align:center">computing…</td></tr>';
+  setTimeout(()=>{
+    btn.disabled=false; btn.innerHTML=orig;
+    renderPerf(); renderUniverse();
+    // scroll to results
+    document.getElementById('perf_card').scrollIntoView({behavior:'smooth',block:'start'});
+  }, 1800);
+});
+
+// ─── Performance table mock data ──────────────────────────────────────────────
+const PERF=[
+  {date:'2026-01-15',quantum:['GOLD','OIL','NVDA'],ml:['GOLD','OIL','GOOG'],meta:'quantum',fb:false,sharpe:2.31},
+  {date:'2026-01-29',quantum:['GOLD','OIL','NVDA','HOUSING'],ml:['GOLD','OIL','NVDA','RESIDENTIAL'],meta:'quantum',fb:false,sharpe:1.97},
+  {date:'2026-02-12',quantum:['GOLD','PALLADIUM','NVDA'],ml:['GOLD','OIL','NVDA'],meta:'blend',fb:false,sharpe:1.44},
+  {date:'2026-02-26',quantum:['GOLD','OIL','NVDA','HOUSING'],ml:['GOLD','OIL','NVDA','RESIDENTIAL'],meta:'quantum',fb:false,sharpe:2.08},
+  {date:'2026-03-12',quantum:['GOLD','OIL','GOOG'],ml:['GOLD','SILVER','GOOG'],meta:'ml',fb:false,sharpe:0.87},
+  {date:'2026-03-26',quantum:['GOLD','OIL','NVDA','HOUSING'],ml:['GOLD','OIL','NVDA','HOUSING'],meta:'quantum',fb:false,sharpe:2.42},
+  {date:'2026-04-09',quantum:['GOLD','OIL'],ml:['GOLD','GOOG'],meta:'local brute force',fb:true,sharpe:1.12},
+  {date:'2026-04-23',quantum:['GOLD','OIL','NVDA','HOUSING'],ml:['GOLD','OIL','NVDA','RESIDENTIAL'],meta:'quantum',fb:false,sharpe:2.19},
+  {date:'2026-05-07',quantum:['GOLD','OIL','NVDA'],ml:['GOLD','OIL','GOOG'],meta:'quantum',fb:false,sharpe:1.88},
+  {date:'2026-05-21',quantum:['GOLD','OIL','NVDA','HOUSING'],ml:['GOLD','OIL','NVDA','RESIDENTIAL'],meta:'quantum',fb:false,sharpe:2.04},
+];
+const mx=Math.max(...PERF.map(p=>Math.abs(p.sharpe)));
+function cls(t){return COMMODITIES.includes(t)?'<span class="cls-cmd" style="font-size:9px">CMD</span>':HOUSING.includes(t)?'<span class="cls-re" style="font-size:9px">RE</span>':''}
+function fmtTickers(arr){return arr.map(t=>`${t}${cls(t)}`).join(', ')}
+
+function renderPerf(){
+  document.getElementById('perf_rows').innerHTML=PERF.map(p=>{
+    const w=(Math.abs(p.sharpe)/mx*100).toFixed(0);
+    const col=p.sharpe>=0?'var(--good)':'var(--bad)';
+    return `<tr>
+      <td>${p.date}</td>
+      <td class="q" style="font-size:11px">${fmtTickers(p.quantum)}</td>
+      <td class="m" style="font-size:11px">${fmtTickers(p.ml)}</td>
+      <td class="x">${p.meta}</td>
+      <td style="color:${p.fb?'var(--bad)':'var(--mut)'}">${p.fb?'yes':'—'}</td>
+      <td style="min-width:100px"><div class="bar"><span style="width:${w}%;background:${col}"></span></div></td>
+      <td style="text-align:right;color:${col};font-weight:700">${p.sharpe.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── Universe table mock data ─────────────────────────────────────────────────
+const UNIV=[
+  {t:'NVDA',   cls:'equity',      exp:.181, vol:.393, q:true,  m:true,  meta:true},
+  {t:'GOOG',   cls:'equity',      exp:.105, vol:.253, q:false, m:false, meta:false},
+  {t:'GOLD',   cls:'commodity',   exp:.094, vol:.180, q:true,  m:true,  meta:true},
+  {t:'SILVER', cls:'commodity',   exp:.076, vol:.295, q:false, m:false, meta:false},
+  {t:'PLATINUM',cls:'commodity',  exp:.063, vol:.227, q:false, m:false, meta:false},
+  {t:'PALLADIUM',cls:'commodity', exp:.127, vol:.397, q:false, m:false, meta:false},
+  {t:'OIL',    cls:'commodity',   exp:.082, vol:.321, q:true,  m:true,  meta:true},
+  {t:'HOUSING',cls:'real_estate', exp:.056, vol:.180, q:true,  m:false, meta:true},
+  {t:'HOMEBUILDERS',cls:'real_estate',exp:.031,vol:.252,q:false,m:false,meta:false},
+  {t:'MORTGAGES',cls:'real_estate',exp:.079,vol:.218,q:false,m:false,meta:false},
+  {t:'COMMERCIAL_RE',cls:'real_estate',exp:.051,vol:.195,q:false,m:false,meta:false},
+  {t:'RESIDENTIAL',cls:'real_estate',exp:.041,vol:.181,q:false,m:true,meta:false},
+];
+const uxMx=Math.max(...UNIV.map(u=>Math.abs(u.exp)));
+function clsBadge(cls){
+  if(cls==='commodity') return '<span class="cls-cmd">CMD</span>';
+  if(cls==='real_estate') return '<span class="cls-re">RE</span>';
+  return '<span class="cls-eq">EQ</span>';
+}
+
+function renderUniverse(){
+  document.getElementById('univ_rows').innerHTML=UNIV.map(u=>{
+    const w=(Math.abs(u.exp)/uxMx*100).toFixed(0);
+    const col=u.exp>=0?'var(--ml)':'var(--bad)';
+    const tags=[
+      u.q?'<span class="badge" style="border-color:var(--quantum);color:var(--quantum);font-size:10px">Q</span>':'',
+      u.m?'<span class="badge" style="border-color:var(--ml);color:var(--ml);font-size:10px">ML</span>':'',
+      u.meta?'<span class="badge" style="border-color:var(--meta);color:var(--meta);font-size:10px">META</span>':'',
+    ].join(' ');
+    return `<tr>
+      <td><b>${u.t}</b></td>
+      <td>${clsBadge(u.cls)}</td>
+      <td style="min-width:140px"><div class="bar"><span style="width:${w}%;background:${col}"></span></div></td>
+      <td style="text-align:right">${(u.exp*100).toFixed(1)}%</td>
+      <td style="text-align:right;color:var(--mut)">${(u.vol*100).toFixed(1)}%</td>
+      <td>${tags}</td>
+    </tr>`;
+  }).join('');
+}
+
+// render on load
+renderPerf();
+renderUniverse();
+</script>
+</body>
+</html>
