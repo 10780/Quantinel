@@ -383,8 +383,8 @@ $('queue_round').addEventListener('input',()=>$('qr_lbl').textContent=$('queue_r
 $('qr_lbl').textContent=$('queue_round').value;
 
 // ---- ticker buttons ----
-const EQUITIES=["NVDA","GOOG","AAPL","MSFT","AMZN","META","TSLA","AMD","NFLX","INTC","AVGO","ADBE","CRM","ORCL","QCOM","CSCO"];
-const COMMODITIES=["GOLD","SILVER","PLATINUM","PALLADIUM","OIL"];
+const EQUITIES=["NVDA","GOOG","AAPL","MSFT","AMZN","META","TSLA","AMD","NFLX","INTC","AVGO","ADBE","CRM","ORCL","QCOM","CSCO","TSM","HDRN","JOBY"];
+const COMMODITIES=["GOLD","SILVER","PLATINUM","PALLADIUM","OIL","URANIUM","LITHIUM","NEODYMIUM","CORN","WHEAT","RICE","SOYBEANS","SUGAR"];
 const HOUSING=["HOUSING","HOMEBUILDERS","MORTGAGES","COMMERCIAL_RE","RESIDENTIAL"];
 const UNIVERSE=[...EQUITIES,...COMMODITIES,...HOUSING];
 const DEFAULT_ON=new Set(EQUITIES.slice(0,10));
@@ -404,7 +404,7 @@ HOUSING.forEach(t=>addTickerBtn(t,false,'re_btns'));
 $('tk_addbtn').onclick=()=>{
   const v=$('tk_add').value.trim().toUpperCase();
   if(v) v.split(/[ ,]+/).filter(Boolean).forEach(t=>{
-    const isCom=COMMODITIES.includes(t)||['GC=F','SI=F','PL=F','PA=F','CL=F'].includes(t);
+    const isCom=COMMODITIES.includes(t)||['GC=F','SI=F','PL=F','PA=F','CL=F','URA','LIT','MP','ZC=F','ZW=F','ZR=F','ZS=F','SB=F'].includes(t);
     const isRe=HOUSING.includes(t)||['VNQ','ITB','REM','IYR','REZ'].includes(t);
     addTickerBtn(t,true,isCom?'cm_btns':isRe?'re_btns':'tk_btns');
   });

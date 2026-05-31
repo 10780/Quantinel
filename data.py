@@ -349,11 +349,21 @@ class TinyMockDataSource:
 
 # Friendly display name -> Yahoo Finance futures symbol
 COMMODITY_YFINANCE_SYMBOLS: dict[str, str] = {
-    "GOLD":      "GC=F",
-    "SILVER":    "SI=F",
-    "PLATINUM":  "PL=F",
-    "PALLADIUM": "PA=F",
-    "OIL":       "CL=F",
+    "GOLD":       "GC=F",
+    "SILVER":     "SI=F",
+    "PLATINUM":   "PL=F",
+    "PALLADIUM":  "PA=F",
+    "OIL":        "CL=F",
+    # Energy transition / critical minerals — traded via ETF proxies on Yahoo
+    "URANIUM":    "URA",   # Global X Uranium ETF
+    "LITHIUM":    "LIT",   # Global X Lithium & Battery Tech ETF
+    "NEODYMIUM":  "MP",    # MP Materials (rare-earth primary)
+    # Agricultural futures (CBOT / ICE)
+    "CORN":       "ZC=F",  # CBOT corn futures
+    "WHEAT":      "ZW=F",  # CBOT wheat futures
+    "RICE":       "ZR=F",  # CBOT rough rice futures
+    "SOYBEANS":   "ZS=F",  # CBOT soybean futures
+    "SUGAR":      "SB=F",  # ICE raw sugar No. 11
 }
 
 # Realistic synthetic parameters: (annual_drift, annual_vol, start_price)
@@ -363,17 +373,39 @@ _COMMODITY_MOCK_PARAMS: dict[str, tuple[float, float, float]] = {
     "PLATINUM":  (0.03, 0.22,  950.0),
     "PALLADIUM": (0.04, 0.35, 1000.0),
     "OIL":       (0.05, 0.30,   75.0),
+    # Energy transition commodities
+    "URANIUM":   (0.12, 0.40,   28.0),   # URA ETF
+    "LITHIUM":   (0.08, 0.45,   55.0),   # LIT ETF
+    "NEODYMIUM": (0.10, 0.50,   18.0),   # MP Materials share
+    # Agricultural futures
+    "CORN":      (0.03, 0.25,  450.0),   # cents/bushel
+    "WHEAT":     (0.02, 0.28,  550.0),   # cents/bushel
+    "RICE":      (0.02, 0.20,   15.0),   # $/cwt rough rice
+    "SOYBEANS":  (0.04, 0.23, 1200.0),   # cents/bushel
+    "SUGAR":     (0.03, 0.32,   20.0),   # cents/lb raw No. 11
 }
 
-# Intra-group correlation matrix rows/cols ordered as the keys above.
-# Precious metals (first 4) are highly correlated; OIL has weaker linkage.
+# Intra-group correlation matrix rows/cols ordered as the keys above (13×13).
+# Precious metals (0-3): highly correlated (~0.50-0.60).
+# OIL (4): weakly correlated with metals; moderate agri linkage via biofuels.
+# Energy-transition block (5-7): moderately correlated among themselves.
+# Agricultural grains (8-11): CORN/WHEAT/RICE/SOYBEANS highly correlated.
+# SUGAR (12): moderately linked to grains, energy (Brazil ethanol), and OIL.
 _COMMODITY_CORR: np.ndarray = np.array([
-    #  GOLD  SILV  PLAT  PALL   OIL
-    [1.00, 0.60, 0.60, 0.55, 0.20],  # GOLD
-    [0.60, 1.00, 0.55, 0.50, 0.20],  # SILVER
-    [0.60, 0.55, 1.00, 0.55, 0.15],  # PLATINUM
-    [0.55, 0.50, 0.55, 1.00, 0.15],  # PALLADIUM
-    [0.20, 0.20, 0.15, 0.15, 1.00],  # OIL
+    #  GOLD  SILV  PLAT  PALL   OIL  URAN  LITH  NEOD  CORN  WHAT  RICE  SOYB  SUGR
+    [1.00, 0.60, 0.60, 0.55, 0.20, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05],  # GOLD
+    [0.60, 1.00, 0.55, 0.50, 0.20, 0.05, 0.08, 0.05, 0.05, 0.05, 0.05, 0.05, 0.05],  # SILVER
+    [0.60, 0.55, 1.00, 0.55, 0.15, 0.08, 0.10, 0.10, 0.08, 0.08, 0.05, 0.08, 0.05],  # PLATINUM
+    [0.55, 0.50, 0.55, 1.00, 0.15, 0.08, 0.10, 0.10, 0.08, 0.08, 0.05, 0.08, 0.05],  # PALLADIUM
+    [0.20, 0.20, 0.15, 0.15, 1.00, 0.15, 0.10, 0.08, 0.25, 0.15, 0.12, 0.22, 0.20],  # OIL
+    [0.05, 0.05, 0.08, 0.08, 0.15, 1.00, 0.45, 0.35, 0.05, 0.05, 0.05, 0.05, 0.05],  # URANIUM
+    [0.05, 0.08, 0.10, 0.10, 0.10, 0.45, 1.00, 0.50, 0.05, 0.05, 0.05, 0.05, 0.05],  # LITHIUM
+    [0.05, 0.05, 0.10, 0.10, 0.08, 0.35, 0.50, 1.00, 0.05, 0.05, 0.05, 0.05, 0.05],  # NEODYMIUM
+    [0.05, 0.05, 0.08, 0.08, 0.25, 0.05, 0.05, 0.05, 1.00, 0.65, 0.40, 0.60, 0.25],  # CORN
+    [0.05, 0.05, 0.08, 0.08, 0.15, 0.05, 0.05, 0.05, 0.65, 1.00, 0.45, 0.55, 0.20],  # WHEAT
+    [0.05, 0.05, 0.05, 0.05, 0.12, 0.05, 0.05, 0.05, 0.40, 0.45, 1.00, 0.40, 0.18],  # RICE
+    [0.05, 0.05, 0.08, 0.08, 0.22, 0.05, 0.05, 0.05, 0.60, 0.55, 0.40, 1.00, 0.22],  # SOYBEANS
+    [0.05, 0.05, 0.05, 0.05, 0.20, 0.05, 0.05, 0.05, 0.25, 0.20, 0.18, 0.22, 1.00],  # SUGAR
 ])
 
 
@@ -381,16 +413,16 @@ class CommodityDataSource:
     """Fetches commodity futures data via yfinance.
 
     Uses human-readable ticker names (``GOLD``, ``SILVER``, ``PLATINUM``,
-    ``PALLADIUM``, ``OIL``) and maps them internally to the correct Yahoo
-    Finance futures symbols (``GC=F``, ``SI=F``, ``PL=F``, ``PA=F``,
-    ``CL=F``).  Returns a ``MarketData`` with ``asset_classes`` set to
-    ``AssetClass.COMMODITY`` for every ticker.
+    ``PALLADIUM``, ``OIL``, ``URANIUM``, ``LITHIUM``, ``NEODYMIUM``) and maps
+    them internally to the correct Yahoo Finance symbols.  Returns a
+    ``MarketData`` with ``asset_classes`` set to ``AssetClass.COMMODITY`` for
+    every ticker.
 
     Parameters
     ----------
     commodities : list[str] | None
         Subset of ``COMMODITY_YFINANCE_SYMBOLS`` keys to load.
-        Defaults to all five (GOLD, SILVER, PLATINUM, PALLADIUM, OIL).
+        Defaults to all eight.
     start : str
         Start date in ``YYYY-MM-DD`` format.
     end : str | None
@@ -443,15 +475,18 @@ class CommodityDataSource:
 class MockCommodityDataSource:
     """Synthetic commodity data with realistic block-correlation structure.
 
-    Generates correlated daily OHLCV for the five standard commodities
-    (GOLD, SILVER, PLATINUM, PALLADIUM, OIL) using the same Cholesky
-    construction as ``MockDataSource``.  The precious-metals group is
-    internally correlated (~0.55–0.60); OIL is only weakly linked (~0.15–0.20).
+    Generates correlated daily OHLCV for the eight standard commodities
+    (GOLD, SILVER, PLATINUM, PALLADIUM, OIL, URANIUM, LITHIUM, NEODYMIUM)
+    using the same Cholesky construction as ``MockDataSource``.  The precious-
+    metals group is internally correlated (~0.55–0.60); OIL is weakly linked
+    (~0.15–0.20); the energy-transition block (URANIUM, LITHIUM, NEODYMIUM)
+    is moderately correlated among themselves (~0.35–0.50) and weakly linked
+    to the other groups.
 
     Parameters
     ----------
     commodities : list[str] | None
-        Subset of the five commodities to generate.  Defaults to all five.
+        Subset of the eight commodities to generate.  Defaults to all eight.
     n_days : int
         Number of business days of history (default 504 ≈ 2 years).
     seed : int

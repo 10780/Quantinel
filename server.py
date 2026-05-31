@@ -65,6 +65,24 @@ _KNOWN_PARAMS: dict[str, tuple[float, float, float]] = {
     "ORCL": (0.20, 0.28, 135.0),
     "QCOM": (0.15, 0.35, 180.0),
     "CSCO": (0.10, 0.25, 55.0),
+    "TSM":  (0.18, 0.32, 165.0),   # Taiwan Semiconductor
+    "HDRN": (0.05, 0.80,   2.5),   # Hedron (high-vol small cap)
+    "JOBY": (0.08, 0.75,   6.0),   # Joby Aviation (eVTOL)
+    # Commodities (synthetic price proxies)
+    "GOLD":      (0.07, 0.15, 2000.0),
+    "SILVER":    (0.05, 0.25,   25.0),
+    "PLATINUM":  (0.03, 0.22,  950.0),
+    "PALLADIUM": (0.04, 0.35, 1000.0),
+    "OIL":       (0.05, 0.30,   75.0),
+    "URANIUM":   (0.12, 0.40,   28.0),
+    "LITHIUM":   (0.08, 0.45,   55.0),
+    "NEODYMIUM": (0.10, 0.50,   18.0),
+    # Agricultural futures
+    "CORN":      (0.03, 0.25,  450.0),
+    "WHEAT":     (0.02, 0.28,  550.0),
+    "RICE":      (0.02, 0.20,   15.0),
+    "SOYBEANS":  (0.04, 0.23, 1200.0),
+    "SUGAR":     (0.03, 0.32,   20.0),
 }
 
 
