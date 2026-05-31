@@ -21,7 +21,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from contracts import MarketData
+from contracts import AssetClass, MarketData
 
 
 # ============================================================================
@@ -341,3 +341,228 @@ class TinyMockDataSource:
                 "relevance": 0.85,
             },
         ]
+
+
+# ============================================================================
+# COMMODITY DATA SOURCES
+# ============================================================================
+
+# Friendly display name -> Yahoo Finance futures symbol
+COMMODITY_YFINANCE_SYMBOLS: dict[str, str] = {
+    "GOLD":      "GC=F",
+    "SILVER":    "SI=F",
+    "PLATINUM":  "PL=F",
+    "PALLADIUM": "PA=F",
+    "OIL":       "CL=F",
+}
+
+# Realistic synthetic parameters: (annual_drift, annual_vol, start_price)
+_COMMODITY_MOCK_PARAMS: dict[str, tuple[float, float, float]] = {
+    "GOLD":      (0.07, 0.15, 2000.0),
+    "SILVER":    (0.05, 0.25,   25.0),
+    "PLATINUM":  (0.03, 0.22,  950.0),
+    "PALLADIUM": (0.04, 0.35, 1000.0),
+    "OIL":       (0.05, 0.30,   75.0),
+}
+
+# Intra-group correlation matrix rows/cols ordered as the keys above.
+# Precious metals (first 4) are highly correlated; OIL has weaker linkage.
+_COMMODITY_CORR: np.ndarray = np.array([
+    #  GOLD  SILV  PLAT  PALL   OIL
+    [1.00, 0.60, 0.60, 0.55, 0.20],  # GOLD
+    [0.60, 1.00, 0.55, 0.50, 0.20],  # SILVER
+    [0.60, 0.55, 1.00, 0.55, 0.15],  # PLATINUM
+    [0.55, 0.50, 0.55, 1.00, 0.15],  # PALLADIUM
+    [0.20, 0.20, 0.15, 0.15, 1.00],  # OIL
+])
+
+
+class CommodityDataSource:
+    """Fetches commodity futures data via yfinance.
+
+    Uses human-readable ticker names (``GOLD``, ``SILVER``, ``PLATINUM``,
+    ``PALLADIUM``, ``OIL``) and maps them internally to the correct Yahoo
+    Finance futures symbols (``GC=F``, ``SI=F``, ``PL=F``, ``PA=F``,
+    ``CL=F``).  Returns a ``MarketData`` with ``asset_classes`` set to
+    ``AssetClass.COMMODITY`` for every ticker.
+
+    Parameters
+    ----------
+    commodities : list[str] | None
+        Subset of ``COMMODITY_YFINANCE_SYMBOLS`` keys to load.
+        Defaults to all five (GOLD, SILVER, PLATINUM, PALLADIUM, OIL).
+    start : str
+        Start date in ``YYYY-MM-DD`` format.
+    end : str | None
+        End date (exclusive). Defaults to today.
+    """
+
+    DEFAULT_COMMODITIES: list[str] = list(COMMODITY_YFINANCE_SYMBOLS)
+
+    def __init__(
+        self,
+        commodities: list[str] | None = None,
+        start: str = "2023-01-01",
+        end: str | None = None,
+    ) -> None:
+        self.commodities = commodities or self.DEFAULT_COMMODITIES
+        self.start = start
+        self.end = end or pd.Timestamp.today().strftime("%Y-%m-%d")
+
+    def load(self) -> MarketData:
+        """Download commodity futures and return a ``MarketData`` contract."""
+        import yfinance as yf
+
+        yf_symbols = [COMMODITY_YFINANCE_SYMBOLS[c] for c in self.commodities]
+
+        raw = yf.download(
+            yf_symbols,
+            start=self.start,
+            end=self.end,
+            auto_adjust=True,
+            progress=False,
+        )
+
+        bars: dict[str, pd.DataFrame] = {}
+        for name, symbol in zip(self.commodities, yf_symbols):
+            if isinstance(raw.columns, pd.MultiIndex):
+                df = raw.xs(symbol, axis=1, level=1).dropna()
+            else:
+                df = raw.dropna()
+            df = df.rename(columns=str.lower)
+            bars[name] = df[["open", "high", "low", "close", "volume"]]
+
+        asset_classes = {c: AssetClass.COMMODITY for c in self.commodities}
+        return MarketData(
+            tickers=self.commodities,
+            bars=bars,
+            asset_classes=asset_classes,
+        )
+
+
+class MockCommodityDataSource:
+    """Synthetic commodity data with realistic block-correlation structure.
+
+    Generates correlated daily OHLCV for the five standard commodities
+    (GOLD, SILVER, PLATINUM, PALLADIUM, OIL) using the same Cholesky
+    construction as ``MockDataSource``.  The precious-metals group is
+    internally correlated (~0.55–0.60); OIL is only weakly linked (~0.15–0.20).
+
+    Parameters
+    ----------
+    commodities : list[str] | None
+        Subset of the five commodities to generate.  Defaults to all five.
+    n_days : int
+        Number of business days of history (default 504 ≈ 2 years).
+    seed : int
+        Random seed for reproducibility.
+    """
+
+    DEFAULT_COMMODITIES: list[str] = list(_COMMODITY_MOCK_PARAMS)
+
+    def __init__(
+        self,
+        commodities: list[str] | None = None,
+        n_days: int = 504,
+        seed: int = 42,
+    ) -> None:
+        self.commodities = commodities or self.DEFAULT_COMMODITIES
+        self.n_days = n_days
+        self.seed = seed
+
+    def load(self) -> MarketData:
+        """Generate synthetic commodity OHLCV and return a ``MarketData`` contract."""
+        rng = np.random.default_rng(self.seed)
+
+        all_names = list(_COMMODITY_MOCK_PARAMS)
+        indices = [all_names.index(c) for c in self.commodities]
+
+        # Sub-select correlation block for requested commodities
+        corr = _COMMODITY_CORR[np.ix_(indices, indices)].copy()
+        L = np.linalg.cholesky(corr)
+
+        dates = pd.bdate_range(
+            end=pd.Timestamp.today().normalize(), periods=self.n_days
+        )
+        n = len(dates)
+        n_assets = len(self.commodities)
+
+        mu  = np.array([_COMMODITY_MOCK_PARAMS[c][0] for c in self.commodities]) / 252
+        sig = np.array([_COMMODITY_MOCK_PARAMS[c][1] for c in self.commodities]) / np.sqrt(252)
+
+        z = rng.standard_normal((n, n_assets))
+        daily_returns = mu + sig * (z @ L.T)
+
+        bars: dict[str, pd.DataFrame] = {}
+        for i, name in enumerate(self.commodities):
+            start_price = _COMMODITY_MOCK_PARAMS[name][2]
+            close = start_price * np.cumprod(1 + daily_returns[:, i])
+
+            open_ = np.concatenate([[close[0]], close[:-1]]) * (
+                1 + rng.normal(0, 0.001, n)
+            )
+            high = np.maximum(open_, close) * (1 + np.abs(rng.normal(0, 0.004, n)))
+            low  = np.minimum(open_, close) * (1 - np.abs(rng.normal(0, 0.004, n)))
+            # Commodity futures volume is contracts traded — use smaller scale
+            volume = rng.integers(10_000, 200_000, n).astype(float)
+
+            bars[name] = pd.DataFrame(
+                {"open": open_, "high": high, "low": low, "close": close, "volume": volume},
+                index=dates,
+            )
+
+        asset_classes = {c: AssetClass.COMMODITY for c in self.commodities}
+        return MarketData(
+            tickers=self.commodities,
+            bars=bars,
+            asset_classes=asset_classes,
+        )
+
+
+class CombinedDataSource:
+    """Merges an equity data source and a commodity data source into one ``MarketData``.
+
+    All downstream layers (Forecast, Risk, Optimizer) are ticker-agnostic and
+    work unchanged on the combined universe.  The ``asset_classes`` field on the
+    returned ``MarketData`` lets any layer filter by asset type when needed.
+
+    Parameters
+    ----------
+    equity_source : DataSource
+        Any source with a ``load() -> MarketData`` method (e.g. ``MockDataSource``,
+        ``YFinanceDataSource``).
+    commodity_source : DataSource
+        Any source with a ``load() -> MarketData`` method (e.g.
+        ``MockCommodityDataSource``, ``CommodityDataSource``).
+    """
+
+    def __init__(self, equity_source, commodity_source) -> None:
+        self.equity_source = equity_source
+        self.commodity_source = commodity_source
+
+    def load(self) -> MarketData:
+        """Load both sources and merge into a single ``MarketData`` contract."""
+        eq = self.equity_source.load()
+        co = self.commodity_source.load()
+
+        # Align date indices: take the intersection of business days
+        eq_idx = eq.close_prices().index
+        co_idx = co.close_prices().index
+        common = eq_idx.intersection(co_idx)
+
+        merged_bars: dict[str, pd.DataFrame] = {}
+        for t in eq.tickers:
+            merged_bars[t] = eq.bars[t].loc[common]
+        for t in co.tickers:
+            merged_bars[t] = co.bars[t].loc[common]
+
+        combined_tickers = eq.tickers + co.tickers
+        combined_classes = {
+            **{t: AssetClass.EQUITY for t in eq.tickers},
+            **co.asset_classes,
+        }
+        return MarketData(
+            tickers=combined_tickers,
+            bars=merged_bars,
+            asset_classes=combined_classes,
+        )

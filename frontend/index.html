@@ -149,8 +149,10 @@
         <option value="synthetic">Synthetic (offline, instant)</option>
         <option value="live">Live (yfinance)</option>
       </select>
-      <label>Universe (click to toggle)</label>
+      <label style="margin-bottom:2px">Equities <span style="color:var(--mut);font-weight:400">(click to toggle)</span></label>
       <div id="tk_btns" class="tkwrap"></div>
+      <label style="margin-top:10px;margin-bottom:2px">Commodities <span style="color:var(--mut);font-weight:400">(click to toggle)</span></label>
+      <div id="cm_btns" class="tkwrap"></div>
       <div class="addrow"><input id="tk_add" placeholder="add ticker(s)"/><button id="tk_addbtn">+ add</button></div>
       <div class="row" style="margin-top:8px">
         <div><label>Start (live)</label><input id="start" value="2023-01-01"/></div>
@@ -292,10 +294,12 @@ $('queue_round').addEventListener('input',()=>$('qr_lbl').textContent=$('queue_r
 $('qr_lbl').textContent=$('queue_round').value;
 
 // ---- ticker buttons ----
-const UNIVERSE=["NVDA","GOOG","AAPL","MSFT","AMZN","META","TSLA","AMD","NFLX","INTC","AVGO","ADBE","CRM","ORCL","QCOM","CSCO"];
-const DEFAULT_ON=new Set(UNIVERSE.slice(0,10));
-function addTickerBtn(t,on){
-  const wrap=$('tk_btns');
+const EQUITIES=["NVDA","GOOG","AAPL","MSFT","AMZN","META","TSLA","AMD","NFLX","INTC","AVGO","ADBE","CRM","ORCL","QCOM","CSCO"];
+const COMMODITIES=["GOLD","SILVER","PLATINUM","PALLADIUM","OIL"];
+const UNIVERSE=[...EQUITIES,...COMMODITIES];
+const DEFAULT_ON=new Set(EQUITIES.slice(0,10));
+function addTickerBtn(t,on,group){
+  const wrap=$(group||'tk_btns');
   const existing=[...wrap.children].find(b=>b.dataset.t===t);
   if(existing){if(on) existing.classList.add('on'); return;}
   const b=document.createElement('button');
@@ -303,15 +307,21 @@ function addTickerBtn(t,on){
   b.onclick=()=>b.classList.toggle('on');
   wrap.appendChild(b);
 }
-UNIVERSE.forEach(t=>addTickerBtn(t,DEFAULT_ON.has(t)));
+EQUITIES.forEach(t=>addTickerBtn(t,DEFAULT_ON.has(t),'tk_btns'));
+COMMODITIES.forEach(t=>addTickerBtn(t,false,'cm_btns'));
 $('tk_addbtn').onclick=()=>{
   const v=$('tk_add').value.trim().toUpperCase();
-  if(v) v.split(/[ ,]+/).filter(Boolean).forEach(t=>addTickerBtn(t,true));
+  if(v) v.split(/[ ,]+/).filter(Boolean).forEach(t=>{
+    const isCom=COMMODITIES.includes(t)||['GC=F','SI=F','PL=F','PA=F','CL=F'].includes(t);
+    addTickerBtn(t,true,isCom?'cm_btns':'tk_btns');
+  });
   $('tk_add').value='';
 };
 function selectedTickers(){
-  const on=[...document.querySelectorAll('#tk_btns .tkbtn.on')].map(b=>b.dataset.t);
-  return on.length?on.join(','):UNIVERSE.slice(0,10).join(',');
+  const eq=[...document.querySelectorAll('#tk_btns .tkbtn.on')].map(b=>b.dataset.t);
+  const cm=[...document.querySelectorAll('#cm_btns .tkbtn.on')].map(b=>b.dataset.t);
+  const all=[...eq,...cm];
+  return all.length?all.join(','):EQUITIES.slice(0,10).join(',');
 }
 
 // ---- collect params ----
@@ -453,7 +463,11 @@ function universePanel(u){
       a.in_ml?'<span class="badge" style="border-color:var(--ml);color:var(--ml)">ML</span>':'',
       a.in_meta?'<span class="badge" style="border-color:var(--meta);color:var(--meta)">META</span>':'',
     ].join(' ');
-    return `<tr><td><b>${esc(a.ticker)}</b></td>
+    const cls=a.asset_class||'equity';
+    const clsBadge=cls==='commodity'
+      ?'<span class="badge" style="border-color:#fbbf24;color:#fbbf24">CMD</span>'
+      :'<span class="badge" style="border-color:var(--mut);color:var(--mut)">EQ</span>';
+    return `<tr><td><b>${esc(a.ticker)}</b> ${clsBadge}</td>
       <td style="min-width:140px"><div class="bar"><span style="width:${w}%;background:${col}"></span></div></td>
       <td style="text-align:right">${pct(a.exp_return)}</td>
       <td style="text-align:right;color:var(--mut)">${pct(a.vol)}</td><td>${tags}</td></tr>`;
@@ -470,8 +484,9 @@ function render(d){
   const mlExtra=mlFeatures(d.proposals.ml.features,d.proposals.ml.selected);
   out.innerHTML=
     `<div class="reason" style="margin-bottom:14px;color:var(--mut)">
-       ${d.data.source} data · ${d.data.rows} rows · ${d.data.n_assets} assets ·
-       ${d.data.rebalances} rebalances · as of <b>${d.data.as_of}</b></div>
+       ${d.data.source} data &middot; ${d.data.rows} rows &middot; ${d.data.n_assets} assets
+       ${d.data.n_equities!=null?`(${d.data.n_equities} eq &middot; ${d.data.n_commodities} cmd)`:''} &middot;
+       ${d.data.rebalances} rebalances &middot; as of <b>${d.data.as_of}</b></div>
      <div class="cards">
        ${agentCard('q','QuantumAgent',d.proposals.quantum,qExtra)}
        ${agentCard('ml','MLAgent',d.proposals.ml,mlExtra)}

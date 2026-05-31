@@ -13,9 +13,22 @@ output contract, the rest of the team does not care what is inside it
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Protocol, runtime_checkable
 
 import pandas as pd
+
+# ============================================================================
+# ASSET CLASSIFICATION
+# ============================================================================
+
+
+class AssetClass(str, Enum):
+    """Broad category of a tradeable instrument."""
+
+    EQUITY = "equity"
+    COMMODITY = "commodity"
+
 
 # ============================================================================
 # DATA CONTRACTS  (the messages passed between layers)
@@ -30,6 +43,8 @@ class MarketData:
     bars: dict[
         str, pd.DataFrame
     ]  # ticker -> DataFrame[open, high, low, close, volume], DatetimeIndex
+    asset_classes: dict[str, AssetClass] = field(default_factory=dict)
+    # Maps ticker -> AssetClass; defaults to EQUITY when absent.
 
     def close_prices(self) -> pd.DataFrame:
         return pd.DataFrame({t: self.bars[t]["close"] for t in self.tickers})
@@ -37,10 +52,23 @@ class MarketData:
     def returns(self) -> pd.DataFrame:
         return self.close_prices().pct_change().dropna()
 
+    def asset_class(self, ticker: str) -> AssetClass:
+        """Return the AssetClass for *ticker*, defaulting to EQUITY."""
+        return self.asset_classes.get(ticker, AssetClass.EQUITY)
+
+    def tickers_by_class(self, cls: AssetClass) -> list[str]:
+        """All tickers belonging to the given AssetClass."""
+        return [
+            t for t in self.tickers
+            if self.asset_classes.get(t, AssetClass.EQUITY) == cls
+        ]
+
     def slice_until(self, as_of) -> "MarketData":
         """Point-in-time view: only data up to `as_of` (no look-ahead)."""
         return MarketData(
-            self.tickers, {t: df.loc[:as_of] for t, df in self.bars.items()}
+            tickers=self.tickers,
+            bars={t: df.loc[:as_of] for t, df in self.bars.items()},
+            asset_classes=self.asset_classes,
         )
 
 

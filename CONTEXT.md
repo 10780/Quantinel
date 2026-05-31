@@ -9,7 +9,7 @@ glossary, not a spec. No implementation details live here.
 
 | Layer | Name | Responsibility |
 |-------|------|----------------|
-| 1 | Data | Fetch price bars and news articles. Produce `MarketData` and `NewsFeed`. |
+| 1 | Data | Fetch price bars and news articles for one or more asset classes. Produce `MarketData` (with `asset_classes` metadata) and `NewsFeed`. |
 | 2 | Forecast | Predict future returns from price history. Produce `Forecast`. |
 | 2.5 | Chaos Engine | Detect tail-risk events by fusing market features with news sentiment. Produce `ChaosSignal`. |
 | 2.6 | Crystal Ball | Fuse a short-horizon `Forecast` with a `ChaosSignal` to produce a 1- or 2-year scenario prediction enriched with IFTF futures thinking signals, backcasting, and Two Curves pattern analysis. Produce `CrystalBallPrediction`. |
@@ -21,6 +21,36 @@ glossary, not a spec. No implementation details live here.
 ---
 
 ## Contracts (data that flows between layers)
+
+### AssetClass
+An enum (`contracts.AssetClass`) that tags a ticker with its broad investment
+category. Current values:
+
+| Value | Instruments |
+|---|---|
+| `EQUITY` | Common stocks (e.g. NVDA, GOOG) — default when no tag is set |
+| `COMMODITY` | Physical commodity futures: GOLD (`GC=F`), SILVER (`SI=F`), PLATINUM (`PL=F`), PALLADIUM (`PA=F`), OIL (`CL=F`) |
+
+Consumed by `MarketData.asset_class()` and `MarketData.tickers_by_class()` so
+any layer can filter the universe by type without inspecting ticker names.
+
+### MarketData
+OHLCV bars per ticker, with a DatetimeIndex. Produced by Layer 1. Consumed by
+Forecast (Layer 2) and Risk (Layer 3).
+
+Fields:
+- `tickers`: ordered list of all ticker symbols in the universe.
+- `bars`: `dict[str, DataFrame]` — one OHLCV frame per ticker.
+- `asset_classes`: `dict[str, AssetClass]` — category tag per ticker.
+  Defaults to `{}` (all tickers treated as `EQUITY`).
+
+Helpers:
+- `close_prices()` → aligned `DataFrame` of closing prices.
+- `returns()` → daily pct-change returns, leading row dropped.
+- `asset_class(ticker)` → `AssetClass` for that ticker (defaults to `EQUITY`).
+- `tickers_by_class(cls)` → list of tickers in the given `AssetClass`.
+- `slice_until(as_of)` → point-in-time copy with no look-ahead; preserves
+  `asset_classes`.
 
 ### ChaosSignal
 The output of the Chaos Engine (Layer 2.5). Contains:
@@ -59,10 +89,6 @@ forecast horizon. Above 0.65 triggers a CRASH ALERT; above 0.40 triggers CAUTION
 An adverse market move that exceeds the crash threshold (default: cumulative return
 below −4 % over 5 days). The Chaos Engine labels historical windows as tail events
 to train its classifier.
-
-### MarketData
-OHLCV bars per ticker, with a DatetimeIndex. Produced by Layer 1. Consumed by
-Forecast (Layer 2) and Risk (Layer 3).
 
 ### NewsFeed
 A batch of news articles with per-article ticker association and sentiment scores.
@@ -124,6 +150,22 @@ information coefficient, equity curve. Produced by Layer 6.
 Risk model honesty metrics: VaR breach count and rate, CVaR exceedances,
 disagreement timeline, per-sub-agent calibration. Produced by Layer 6 from the
 per-step risk data stored during the backtest.
+
+---
+
+## Data sources
+
+| Class | Asset class | Backend | Notes |
+|-------|-------------|---------|-------|
+| `MockDataSource` | Equity | synthetic (Cholesky) | Defaults to NVDA + GOOG; configurable via `params`. |
+| `YFinanceDataSource` | Equity | Yahoo Finance (live) | Any equity ticker list. |
+| `MockCommodityDataSource` | Commodity | synthetic (Cholesky) | GOLD, SILVER, PLATINUM, PALLADIUM, OIL with block-correlation structure. |
+| `CommodityDataSource` | Commodity | Yahoo Finance futures (live) | Maps friendly names to `GC=F`, `SI=F`, `PL=F`, `PA=F`, `CL=F`. |
+| `CombinedDataSource` | Equity + Commodity | wraps any two sources | Merges both universes on the intersection of business-day dates; sets `asset_classes` on the returned `MarketData`. |
+
+`COMMODITY_YFINANCE_SYMBOLS` (dict exported from `data.py`) maps the canonical
+names used throughout the pipeline (`GOLD`, `SILVER`, …) to their Yahoo Finance
+futures symbols.
 
 ---
 

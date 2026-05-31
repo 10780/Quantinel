@@ -1,6 +1,6 @@
 # Quantinel: normal vs quantum trading pipeline
 
-Quantinel is a modular NVDA/GOOG backtesting pipeline that compares two trading
+Quantinel is a modular multi-asset backtesting pipeline that compares two trading
 systems on the same market data:
 
 - **Normal pipeline**: recent-return momentum forecast + classical Markowitz optimizer.
@@ -11,10 +11,18 @@ layers. The final `MasterAgent` receives both result summaries, Exa market
 intelligence, and a decision trace, then explains which branch won in simple
 terms.
 
+The pipeline supports multiple asset classes in a single universe. The current
+supported classes are **equities** (e.g. NVDA, GOOG) and **commodities**
+(Gold, Silver, Platinum, Palladium, Oil). Every downstream layer — Forecast,
+Risk, Optimizer, Executor, Scorer — is ticker-agnostic and works unchanged on
+any mixed universe.
+
 ## Current workflow
 
 ```text
-Mock NVDA/GOOG OHLCV data
+Equity data (MockDataSource / YFinanceDataSource)
++ Commodity data (MockCommodityDataSource / CommodityDataSource)
+→ merged by CombinedDataSource into one MarketData universe
         |
         | run in parallel
         |
@@ -125,7 +133,7 @@ set -a; source .env; set +a; .venv/bin/python run_quantum.py
 
 | Layer | File | Normal branch | Quantum branch | Output |
 |-------|------|---------------|----------------|--------|
-| Data | `data.py` | `MockDataSource` | same | `MarketData` |
+| Data | `data.py` | `MockDataSource`, `MockCommodityDataSource`, `CombinedDataSource` | `YFinanceDataSource`, `CommodityDataSource` | `MarketData` |
 | News | `news.py` | `MockNewsSource` during backtest | same | `NewsFeed` |
 | Forecast | `forecast.py` | `MomentumForecaster` | `QuantumForecaster` | `Forecast` |
 | Chaos Engine | `chaos.py` | `ChaosEngine` (optional) | same | `ChaosSignal` |
@@ -371,7 +379,7 @@ numbers are computed in code first, then the agent explains them.
 | `run_master.py` | Main normal-vs-quantum comparison runner. |
 | `run_baseline.py` | Normal-only baseline run. |
 | `run_quantum.py` | Older three-way baseline/quantum/full-quantum comparison. |
-| `contracts.py` | Shared dataclasses and Protocol interfaces. |
+| `contracts.py` | Shared dataclasses and Protocol interfaces, including `AssetClass` enum. |
 | `chaos.py` | Chaos Engine — tail-risk detector using xpyq eigendecomposition and news sentiment. |
 | `forecast.py` | Momentum and xpyq SVD forecast logic. |
 | `optimize.py` | Markowitz, discrete QUBO, and xpyq eig optimizer logic. |
@@ -379,6 +387,48 @@ numbers are computed in code first, then the agent explains them.
 | `score.py` | Performance and risk scoring. |
 | `intelligence.py` | Exa search, sentiment, and theme extraction. |
 | `master_agent.py` | Final report and comparison reasoning. |
+
+## Asset classes
+
+The pipeline uses `AssetClass` (defined in `contracts.py`) to tag every ticker
+with its broad category. Supported values:
+
+| `AssetClass` | Tickers | Data source | Mock source |
+|---|---|---|---|
+| `EQUITY` | NVDA, GOOG, … | `YFinanceDataSource` | `MockDataSource` |
+| `COMMODITY` | GOLD, SILVER, PLATINUM, PALLADIUM, OIL | `CommodityDataSource` | `MockCommodityDataSource` |
+
+`MarketData` exposes two helpers for asset-class-aware logic:
+
+```python
+data.asset_class("GOLD")                       # AssetClass.COMMODITY
+data.tickers_by_class(AssetClass.COMMODITY)    # ["GOLD", "SILVER", ...]
+```
+
+To run the combined equity + commodity universe:
+
+```python
+from data import CombinedDataSource, MockDataSource, MockCommodityDataSource
+source = CombinedDataSource(MockDataSource(), MockCommodityDataSource())
+```
+
+For real data replace either source with `YFinanceDataSource` or
+`CommodityDataSource`. Commodity futures use Yahoo Finance symbols
+(`GC=F`, `SI=F`, `PL=F`, `PA=F`, `CL=F`) mapped internally.
+
+### Commodity mock parameters
+
+| Ticker | Annual drift | Annual vol | Start price | yfinance symbol |
+|--------|-------------|------------|-------------|-----------------|
+| GOLD | 7% | 15% | $2 000 | GC=F |
+| SILVER | 5% | 25% | $25 | SI=F |
+| PLATINUM | 3% | 22% | $950 | PL=F |
+| PALLADIUM | 4% | 35% | $1 000 | PA=F |
+| OIL | 5% | 30% | $75 | CL=F |
+
+Precious metals (GOLD, SILVER, PLATINUM, PALLADIUM) share a correlation of
+≈ 0.55–0.60 with each other. OIL has a weaker correlation of ≈ 0.15–0.20
+with the precious-metals group.
 
 ## Current interpretation
 
