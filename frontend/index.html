@@ -556,6 +556,29 @@ function chaosPanel(c){
       <div class="ak">${action}</div>
     </div>`;
   }).join('');
+  // trader recommendations — group tickers by action tier
+  const REC_TIERS=[
+    {key:'SELL & SHORT', col:'var(--bad)',  icon:'⬇⬇', hint:'Open / increase short position. High crash probability warrants directional short exposure.', test:v=>v<-0.5},
+    {key:'SHORT',        col:'var(--bad)',  icon:'⬇',  hint:'Initiate short via put options or inverse ETF to hedge downside risk.',                      test:v=>v<0},
+    {key:'SELL — REDUCE',col:'#f87171',    icon:'↘',  hint:'Exit most of the position. Preserve capital ahead of an expected drawdown.',                  test:v=>v<0.40},
+    {key:'TRIM',         col:'#f59e0b',    icon:'↙',  hint:'Reduce position size. Limit downside while maintaining partial market exposure.',              test:v=>v<0.70},
+    {key:'HOLD — WATCH', col:'#f59e0b',    icon:'⚠',  hint:'Hold but tighten stop-losses. Re-evaluate on the next rebalance window.',                     test:v=>v<1},
+    {key:'HOLD',         col:'var(--good)', icon:'✓', hint:'No action required. Maintain current position at full weight.',                                test:v=>true},
+  ];
+  const recGroups={};
+  Object.entries(c.ticker_adjustments||{}).forEach(([t,v])=>{
+    const tier=REC_TIERS.find(r=>r.test(v));
+    if(tier){ if(!recGroups[tier.key]) recGroups[tier.key]=tier; recGroups[tier.key].tickers=recGroups[tier.key].tickers||[]; recGroups[tier.key].tickers.push(t); }
+  });
+  const recRows=Object.values(recGroups).filter(g=>g.tickers&&g.tickers.length).map(g=>`
+    <tr>
+      <td style="white-space:nowrap"><span style="color:${g.col};font-weight:800;font-size:13px">${g.icon} ${esc(g.key)}</span></td>
+      <td style="font-weight:700">${g.tickers.map(esc).join(', ')}</td>
+      <td style="color:var(--mut);font-size:12px">${g.hint}</td>
+    </tr>`).join('');
+  const recTable=recRows?`<div class="lbl" style="margin-top:14px">trader recommendations</div>
+    <table><thead><tr><th>action</th><th>assets</th><th>guidance</th></tr></thead>
+    <tbody>${recRows}</tbody></table>`:'';
   const reasoning=c.reasoning?`<details style="margin-top:10px"><summary>Full reasoning &amp; feature signals</summary><pre>${esc(c.reasoning)}</pre></details>`:'';
   return `<div class="card full chaos">
     <div class="chead">
@@ -570,6 +593,7 @@ function chaosPanel(c){
     <div class="lbl">per-ticker position multipliers</div>
     <div style="font-size:12px;color:var(--mut);margin-bottom:6px">Applied to portfolio weights. Values below 1 reduce exposure; negative values signal short.</div>
     <div class="adj-grid">${adjBoxes}</div>
+    ${recTable}
     ${reasoning}
   </div>`;
 }

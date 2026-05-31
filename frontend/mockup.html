@@ -988,6 +988,7 @@
     <div class="adj-grid" id="adj_grid">
       <!-- populated by JS -->
     </div>
+    <div id="chaos_rec"></div>
 
     <!-- feature signals used -->
     <details style="margin-top:14px">
@@ -1103,6 +1104,32 @@ function renderAdjGrid(){
       <div class="ak">${a.label}</div>
     </div>`;
   }).join('');
+  // build trader recommendations grouped by action tier
+  const REC_TIERS=[
+    {key:'SELL &amp; SHORT',col:'var(--bad)',  icon:'⬇⬇',hint:'Open / increase short position. High crash probability warrants directional short exposure.',test:v=>v<-0.5},
+    {key:'SHORT',          col:'var(--bad)',  icon:'⬇', hint:'Initiate short via put options or inverse ETF to hedge downside risk.',                     test:v=>v<0},
+    {key:'SELL — REDUCE', col:'#f87171',    icon:'↘', hint:'Exit most of the position. Preserve capital ahead of an expected drawdown.',                 test:v=>v<0.40},
+    {key:'TRIM',           col:'#f59e0b',    icon:'↙', hint:'Reduce position size. Limit downside while maintaining partial market exposure.',             test:v=>v<0.70},
+    {key:'HOLD — WATCH', col:'#f59e0b',    icon:'⚠', hint:'Hold but tighten stop-losses. Re-evaluate on the next rebalance window.',                    test:v=>v<1},
+    {key:'HOLD',           col:'var(--good)',icon:'✓', hint:'No action required. Maintain current position at full weight.',                               test:v=>true},
+  ];
+  const groups={};
+  Object.entries(CHAOS_ADJ).forEach(([t,a])=>{
+    const tier=REC_TIERS.find(r=>r.test(a.v));
+    if(!tier) return;
+    if(!groups[tier.key]){groups[tier.key]={...tier,tickers:[]};}
+    groups[tier.key].tickers.push(t);
+  });
+  const rows=Object.values(groups).filter(g=>g.tickers.length).map(g=>
+    `<tr>
+      <td style="white-space:nowrap"><span style="color:${g.col};font-weight:800;font-size:13px">${g.icon} ${g.key}</span></td>
+      <td style="font-weight:700">${g.tickers.join(', ')}</td>
+      <td style="color:var(--mut);font-size:12px">${g.hint}</td>
+    </tr>`).join('');
+  document.getElementById('chaos_rec').innerHTML=
+    `<div class="lbl" style="margin-top:14px">trader recommendations</div>
+    <table><thead><tr><th>action</th><th>assets</th><th>guidance</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
 }
 renderAdjGrid();
 
