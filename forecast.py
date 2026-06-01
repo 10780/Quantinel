@@ -76,13 +76,16 @@ class QuantumForecaster:
         lookback: int = 40,
         poll_secs: float = 0.4,
         timeout: float = 20.0,
+        backend: str = "xpyq",    # "xpyq" | "ibm" | "local"
     ):
-        self.api_key = api_key or os.environ.get("XPYQ_KEY", "")
+        self.backend = backend
+        self.api_key = os.environ.get("XPYQ_KEY", "") if api_key is None else api_key
         self.lookback = lookback
         self.poll_secs = poll_secs
         self.timeout = timeout
         self._fallback = MomentumForecaster()
-        self._disabled = not bool(self.api_key)
+        # _disabled only governs the xpyq path; IBM/local backends check self.backend
+        self._disabled = (backend != "xpyq") or (not bool(self.api_key))
         self._stats = {
             "calls": 0,
             "xpyq_completed": 0,
@@ -144,19 +147,72 @@ class QuantumForecaster:
     # Public interface
     # ------------------------------------------------------------------
 
+    def _numpy_svd_predict(
+        self,
+        rets,
+        tickers: list,
+        horizon_days: int,
+        as_of,
+    ) -> Forecast:
+        """
+        Classical numpy SVD factor-signal forecast.
+
+        Used when backend='ibm': IBM QPU handles portfolio optimisation via
+        QAOA; the SVD-based factor forecast runs classically with the same
+        mathematics as the xpyq path.
+        """
+        R = rets[tickers].values.astype(float)
+        U, S, Vt = np.linalg.svd(R, full_matrices=False)  # raises on failure
+        factor_scores_col0 = (U * S)[:, 0]
+        Vt_row0 = Vt[0]
+        ticker_vols = np.array([float(rets[t].std()) for t in tickers])
+
+        factor_vol = float(factor_scores_col0.std()) + 1e-8
+        momentum = float(factor_scores_col0[-1] - factor_scores_col0[-horizon_days])
+
+        expected: dict[str, float] = {}
+        direction: dict[str, int] = {}
+        confidence: dict[str, float] = {}
+        for i, ticker in enumerate(tickers):
+            loading = float(Vt_row0[i])
+            signal = momentum * loading
+            scale = float(ticker_vols[i] * np.sqrt(horizon_days))
+            direction[ticker] = 1 if signal >= 0 else -1
+            confidence[ticker] = float(min(1.0, abs(momentum) / factor_vol))
+            expected[ticker] = float(signal * scale)
+
+        self._stats["xpyq_completed"] += 1
+        return Forecast(
+            as_of=pd.Timestamp(as_of),
+            horizon_days=horizon_days,
+            expected_returns=expected,
+            direction=direction,
+            confidence=confidence,
+        )
+
     def predict(self, data: MarketData, as_of, horizon_days: int) -> Forecast:
         self._stats["calls"] += 1
-        if self._disabled:
-            self._stats["fallbacks"] += 1
-            return self._fallback.predict(data, as_of, horizon_days)
 
         rets = data.returns().loc[:as_of].tail(self.lookback)
-
         if len(rets) < horizon_days + 2:
             self._stats["fallbacks"] += 1
             return self._fallback.predict(data, as_of, horizon_days)
 
         tickers = data.tickers
+
+        if self.backend == "ibm":
+            # IBM QPU is used for optimisation (QaoaOptimizer); the factor
+            # forecast runs via classical numpy SVD with identical mathematics.
+            try:
+                return self._numpy_svd_predict(rets, tickers, horizon_days, as_of)
+            except Exception:
+                self._stats["fallbacks"] += 1
+                return self._fallback.predict(data, as_of, horizon_days)
+
+        if self._disabled:
+            self._stats["fallbacks"] += 1
+            return self._fallback.predict(data, as_of, horizon_days)
+
         R_list = rets[tickers].values.astype(float).tolist()
 
         # Code that runs on xpyq hardware
@@ -279,7 +335,7 @@ class CrystalBall:
         self.lookback = lookback
         self.short_horizon = short_horizon
         self.horizon_days = horizon_days
-        self.api_key = api_key or os.environ.get("XPYQ_KEY", "")
+        self.api_key = os.environ.get("XPYQ_KEY", "") if api_key is None else api_key
         self.poll_secs = poll_secs
         self.timeout = timeout
         self._disabled = not bool(self.api_key)

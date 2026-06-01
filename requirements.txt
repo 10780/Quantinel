@@ -5,3 +5,5 @@ exa-py
 scikit-learn
 yfinance>=0.2.40
 flask>=3.0
+qiskit>=1.0
+qiskit-ibm-runtime>=0.20

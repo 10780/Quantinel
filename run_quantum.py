@@ -2,8 +2,15 @@
 run_quantum.py  —  three-way comparison: baseline vs quantum forecast vs full quantum.
 
   1. Baseline      : MomentumForecaster  + MeanVarianceOptimizer
-  2. Quantum Fcst  : QuantumForecaster   + MeanVarianceOptimizer  (xpyq SVD)
-  3. Full Quantum  : QuantumForecaster   + QaoaOptimizer           (xpyq SVD + eigh)
+  2. Quantum Fcst  : QuantumForecaster   + MeanVarianceOptimizer
+  3. Full Quantum  : QuantumForecaster   + QaoaOptimizer
+
+Quantum backend selection (via environment variables):
+  QUANTUM_BACKEND  — "xpyq" (default) | "ibm" | "local"
+  XPYQ_KEY         — xpyq Bearer token      (required when QUANTUM_BACKEND=xpyq)
+  IBM_TOKEN        — IBM Quantum API token   (required when QUANTUM_BACKEND=ibm)
+  IBM_DEVICE       — specific QPU name       (optional; defaults to least-busy)
+  IBM_SHOTS        — QAOA shot count         (optional; default 1024)
 
 Run:  python run_quantum.py
 """
@@ -18,11 +25,15 @@ from optimize import MeanVarianceOptimizer, QaoaOptimizer
 from risk import SampleCovRisk
 from score import BacktestScorer, RiskScorer
 
-API_KEY = os.environ.get("XPYQ_KEY", "")
-XPYQ_TIMEOUT = float(os.environ.get("XPYQ_TIMEOUT", "20"))
-RISK_N_PATHS = int(os.environ.get("QUANTINEL_N_PATHS", "10000"))
-N_DAYS = int(os.environ.get("QUANTINEL_N_DAYS", "504"))
-REBALANCE_EVERY = int(os.environ.get("QUANTINEL_REBALANCE_EVERY", "5"))
+API_KEY          = os.environ.get("XPYQ_KEY", "")
+QUANTUM_BACKEND  = os.environ.get("QUANTUM_BACKEND", "xpyq")   # "xpyq"|"ibm"|"local"
+IBM_TOKEN        = os.environ.get("IBM_TOKEN", "")
+IBM_DEVICE       = os.environ.get("IBM_DEVICE", "") or None
+IBM_SHOTS        = int(os.environ.get("IBM_SHOTS", "1024"))
+XPYQ_TIMEOUT     = float(os.environ.get("XPYQ_TIMEOUT", "20"))
+RISK_N_PATHS     = int(os.environ.get("QUANTINEL_N_PATHS", "10000"))
+N_DAYS           = int(os.environ.get("QUANTINEL_N_DAYS", "504"))
+REBALANCE_EVERY  = int(os.environ.get("QUANTINEL_REBALANCE_EVERY", "5"))
 
 
 def run(forecaster, optimizer, label):
@@ -64,20 +75,40 @@ def delta(label, a, b):
 
 
 if __name__ == "__main__":
+    print(f"Quantum backend: {QUANTUM_BACKEND.upper()}")
+    if QUANTUM_BACKEND == "ibm":
+        _q_fcst = QuantumForecaster(backend="ibm", timeout=XPYQ_TIMEOUT)
+        _q_opt  = QaoaOptimizer(
+            backend="ibm", ibm_token=IBM_TOKEN,
+            ibm_device=IBM_DEVICE, shots=IBM_SHOTS, timeout=XPYQ_TIMEOUT,
+        )
+        backend_label = "IBM Quantum (p=1 QAOA)"
+    elif QUANTUM_BACKEND == "xpyq":
+        _q_fcst = QuantumForecaster(api_key=API_KEY, timeout=XPYQ_TIMEOUT)
+        _q_opt  = QaoaOptimizer(api_key=API_KEY, timeout=XPYQ_TIMEOUT)
+        backend_label = "xpyq hardware"
+    else:
+        _q_fcst = QuantumForecaster(backend="local")
+        _q_opt  = QaoaOptimizer(backend="local")
+        backend_label = "local (classical fallback)"
+
     print("1/3  Baseline (momentum + Markowitz)...")
     c_base = run(MomentumForecaster(), MeanVarianceOptimizer(), "BASELINE — momentum + Markowitz")
 
-    print("\n2/3  Quantum forecast + classical optimizer (xpyq SVD)...")
-    print("     (submitting SVD workloads to xpyq — ~1 min)")
-    c_qfcst = run(QuantumForecaster(api_key=API_KEY, timeout=XPYQ_TIMEOUT), MeanVarianceOptimizer(),
-                  "QUANTUM FORECAST — xpyq SVD + Markowitz")
+    print(f"\n2/3  Quantum forecast + classical optimizer ({backend_label})...")
+    c_qfcst = run(_q_fcst, MeanVarianceOptimizer(),
+                  f"QUANTUM FORECAST — {backend_label} SVD + Markowitz")
 
-    print("\n3/3  Full quantum: forecast + optimizer (xpyq SVD + eigh)...")
-    print("     (submitting SVD + eigh workloads to xpyq — ~2 min)")
+    print(f"\n3/3  Full quantum: forecast + optimizer ({backend_label})...")
     c_full = run(
-        QuantumForecaster(api_key=API_KEY, timeout=XPYQ_TIMEOUT),
-        QaoaOptimizer(api_key=API_KEY, timeout=XPYQ_TIMEOUT),
-                 "FULL QUANTUM — xpyq SVD + xpyq QUBO eigh")
+        QuantumForecaster(
+            api_key=API_KEY if QUANTUM_BACKEND == "xpyq" else None,
+            backend=QUANTUM_BACKEND,
+            timeout=XPYQ_TIMEOUT,
+        ) if QUANTUM_BACKEND != "ibm" else QuantumForecaster(backend="ibm", timeout=XPYQ_TIMEOUT),
+        _q_opt,
+        f"FULL QUANTUM — {backend_label} SVD + QUBO",
+    )
 
     print(f"\n{'=' * 56}")
     print("  DELTAS")

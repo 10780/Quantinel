@@ -80,7 +80,7 @@ function collectParams(){
     days:+$('days').value, seed:+$('seed').value, K:+$('K').value,
     risk_aversion:+$('risk_aversion').value, penalty:$('penalty').value,
     rebalance_every:+$('rebalance_every').value, lookback:+$('lookback').value,
-    holding:+$('holding').value, use_xpyq:$('use_xpyq').checked,
+    holding:+$('holding').value, quantum_backend:$('quantum_backend').value,
     poll_timeout:+$('poll_timeout').value, use_claude:$('use_claude').checked,
     meta_mode:$('meta_det').checked?'deterministic':'auto',
     shots:+$('shots').value, ibm_backend:$('ibm_device').value||null,
@@ -108,6 +108,14 @@ async function health(){
     p.push(`<span class="pill ${h.openrouter_key_present?'on':'off'}">OpenRouter ${h.openrouter_key_present?'ready':'off'}</span>`);
     $('health').innerHTML=p.join('');
     $('lab_ibm').disabled=!h.ibm_token_present;
+    // Enable/disable backend options in selector based on configured keys
+    const ibmOpt  = document.querySelector('#quantum_backend option[value="ibm"]');
+    const xpyqOpt = document.querySelector('#quantum_backend option[value="xpyq"]');
+    if (ibmOpt)  ibmOpt.disabled  = !h.ibm_token_present;
+    if (xpyqOpt) xpyqOpt.disabled = !h.xpyq_key_present;
+    const sel = $('quantum_backend');
+    if (sel.value === 'ibm'  && !h.ibm_token_present)  sel.value = 'local';
+    if (sel.value === 'xpyq' && !h.xpyq_key_present)  sel.value = 'local';
   }catch(e){$('health').innerHTML='<span class="pill off">health unavailable</span>';}
 }
 health();

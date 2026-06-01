@@ -94,17 +94,19 @@ class DiscreteQuboOptimizer:
 
 class QaoaOptimizer:
     """
-    QUANTUM SWAP — solves the QUBO via eigendecomposition on xpyq hardware.
+    Quantum portfolio optimiser — supports three compute backends:
 
-    The QUBO objective is:  maximise  mu·w - lambda * w'Σw
-    Equivalently:           minimise  w'Qw   where Q = lambda*Sigma - diag(mu)
+      - ``"xpyq"`` (default):  eigendecomposition on xpyq hardware (linalg.eigh).
+      - ``"ibm"``:             p=1 QAOA circuit on an IBM QPU via Qiskit Runtime.
+      - ``"local"``:           classical fallback (DiscreteQuboOptimizer).
 
-    Finding the ground state of Q (eigenvector with lowest eigenvalue) is the
-    quantum relaxation of the QUBO — the same problem QAOA/VQE solve on a QPU.
-    xpyq runs linalg.eigh(Q) on its compute hardware; we read back the ground-state
-    vector, take the sign pattern as discrete long/short positions, and normalise.
+    QUBO objective:   minimise w'Qw   where Q = lambda*Sigma − diag(mu)
 
-    Falls back to DiscreteQuboOptimizer if the API is unreachable.
+    xpyq path: ground-state eigenvector of Q → sign pattern = long/short weights.
+    IBM path:  QUBO encoded in p=1 QAOA circuit; lowest-energy bitstring gives
+               binary {0,1} selection → mapped to {-1,+1} signed weights.
+
+    Falls back to DiscreteQuboOptimizer if the chosen backend is unreachable.
     """
 
     def __init__(
@@ -113,16 +115,26 @@ class QaoaOptimizer:
         risk_aversion: float = 8.0,
         poll_secs: float = 0.4,
         timeout: float = 20.0,
+        backend: str = "xpyq",        # "xpyq" | "ibm" | "local"
+        ibm_token: str | None = None,
+        ibm_device: str | None = None,
+        shots: int = 1024,
     ):
-        self.api_key = api_key or os.environ.get("XPYQ_KEY", "")
+        self.backend = backend
+        self.api_key = os.environ.get("XPYQ_KEY", "") if api_key is None else api_key
+        self.ibm_token = os.environ.get("IBM_TOKEN", "") if ibm_token is None else ibm_token
+        self.ibm_device = ibm_device or os.environ.get("IBM_DEVICE", "") or None
+        self.shots = shots
         self.risk_aversion = risk_aversion
         self.poll_secs = poll_secs
         self.timeout = timeout
         self._fallback = DiscreteQuboOptimizer(risk_aversion=risk_aversion)
+        # _disabled only governs the xpyq path
         self._disabled = not bool(self.api_key)
         self._stats = {
             "calls": 0,
             "xpyq_completed": 0,
+            "quantum_completed": 0,
             "fallbacks": 0,
             "status_counts": {},
         }
@@ -169,9 +181,59 @@ class QaoaOptimizer:
                 return json.loads(line)
         raise ValueError("xpyq stdout did not contain a JSON object")
 
+    # ------------------------------------------------------------------
+    # IBM backend
+    # ------------------------------------------------------------------
+
+    def _solve_via_ibm(
+        self,
+        Q: np.ndarray,
+        tickers: list,
+        forecast: "Forecast",
+        risk: "RiskModel",
+    ) -> "TargetPortfolio":
+        """Solve the portfolio QUBO on an IBM QPU via p=1 QAOA."""
+        from quantum_backends import run_qaoa_ibm
+
+        try:
+            result = run_qaoa_ibm(
+                Q=Q,
+                token=self.ibm_token,
+                device=self.ibm_device,
+                shots=self.shots,
+                poll_interval=self.poll_secs,
+                timeout=self.timeout,
+            )
+            best_x = result["best_x"]
+            if best_x is None:
+                raise ValueError("No valid bitstring decoded from IBM counts")
+
+            # Map binary {0,1} → signed {-1,+1} — same semantic as sign(eigenvector)
+            w = 2.0 * best_x - 1.0
+            gross = float(np.abs(w).sum())
+            if gross > 0:
+                w = w / gross
+
+            shrink = 1.0 / (1.0 + risk.disagreement)
+            weights = {t: float(w[i]) * shrink for i, t in enumerate(tickers)}
+            self._stats["xpyq_completed"] += 0   # IBM path — xpyq_completed stays 0
+            self._stats["quantum_completed"] += 1
+            self._stats["status_counts"]["ibm_done"] = (
+                self._stats["status_counts"].get("ibm_done", 0) + 1
+            )
+            return TargetPortfolio(as_of=forecast.as_of, weights=weights)
+        except Exception:
+            self._stats["fallbacks"] += 1
+            return self._fallback.solve(forecast, risk)
+
+    # ------------------------------------------------------------------
+    # Public interface
+    # ------------------------------------------------------------------
+
     def solve(self, forecast: Forecast, risk: RiskModel) -> TargetPortfolio:
         self._stats["calls"] += 1
-        if self._disabled:
+
+        if self.backend == "local":
             self._stats["fallbacks"] += 1
             return self._fallback.solve(forecast, risk)
 
@@ -181,6 +243,18 @@ class QaoaOptimizer:
 
         # QUBO matrix: minimising w'Qw  ≡  maximising mu'w - lambda * w'Sigma w
         Q = self.risk_aversion * Sigma - np.diag(mu)
+
+        if self.backend == "ibm":
+            if not self.ibm_token:
+                self._stats["fallbacks"] += 1
+                return self._fallback.solve(forecast, risk)
+            return self._solve_via_ibm(Q, tickers, forecast, risk)
+
+        # xpyq path
+        if self._disabled:
+            self._stats["fallbacks"] += 1
+            return self._fallback.solve(forecast, risk)
+
         Q_list = Q.tolist()
 
         code = f"""
@@ -206,6 +280,7 @@ print(json.dumps({{"ground_state": ground_state, "eigvals": eigvals_arr.tolist()
             out = self._parse_json_stdout(result["stdout"])
             ground_state = np.array(out["ground_state"])
             self._stats["xpyq_completed"] += 1
+            self._stats["quantum_completed"] += 1
         except Exception:
             self._disabled = True
             self._stats["fallbacks"] += 1
@@ -224,9 +299,11 @@ print(json.dumps({{"ground_state": ground_state, "eigvals": eigvals_arr.tolist()
 
     def diagnostics(self) -> dict:
         return {
-            "calls": self._stats["calls"],
-            "xpyq_completed": self._stats["xpyq_completed"],
-            "fallbacks": self._stats["fallbacks"],
-            "status_counts": dict(self._stats["status_counts"]),
-            "disabled": self._disabled,
+            "calls":              self._stats["calls"],
+            "xpyq_completed":     self._stats["xpyq_completed"],
+            "quantum_completed":  self._stats["quantum_completed"],
+            "fallbacks":          self._stats["fallbacks"],
+            "status_counts":      dict(self._stats["status_counts"]),
+            "disabled":           self._disabled,
+            "backend":            self.backend,
         }

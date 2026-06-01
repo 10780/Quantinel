@@ -4,7 +4,15 @@ Quantinel is a modular multi-asset backtesting pipeline that compares two tradin
 systems on the same market data:
 
 - **Normal pipeline**: recent-return momentum forecast + classical Markowitz optimizer.
-- **Quantum pipeline**: xpyq SVD factor forecast + xpyq/QUBO-style optimizer.
+- **Quantum pipeline**: quantum factor forecast + quantum/QUBO-style optimizer.
+
+The quantum pipeline supports three interchangeable compute backends:
+
+| Backend | Key required | What runs remotely |
+|---------|-------------|--------------------|
+| `xpyq` (default) | `XPYQ_KEY` | SVD (forecast), `linalg.eigh` (optimizer), `linalg.eig` (ChaosEngine / CrystalBall) |
+| `ibm` | `IBM_TOKEN` | p=1 QAOA circuit (optimizer only; forecast runs classical numpy SVD) |
+| `local` | none | all computation runs locally as classical fallback |
 
 Both simulations run through the same data, news, risk, execution, and scoring
 layers. The final `MasterAgent` receives both result summaries, Exa market
@@ -32,13 +40,14 @@ Equity data (MockDataSource / YFinanceDataSource)
 NORMAL PIPELINE           QUANTUM PIPELINE
    |                           |
 MomentumForecaster        QuantumForecaster
-recent return signal      xpyq SVD factor signal
+recent return signal      SVD factor signal
+   |                       (xpyq hardware  OR classical numpy)
    |                           |
 SampleCovRisk             SampleCovRisk
 same risk engine          same risk engine
    |                           |
 MeanVarianceOptimizer     QaoaOptimizer
-classic Markowitz         xpyq eig/QUBO path
+classic Markowitz         xpyq eigh  OR  IBM QAOA  OR  local
    |                           |
 PaperExecutor             PaperExecutor
 same execution            same execution
@@ -68,7 +77,7 @@ rebalance every 5 trading days
 ```
 
 So `88` means the strategy made 88 weekly trading decisions. In the full quantum
-branch, that can mean up to:
+branch with xpyq, that can mean up to:
 
 ```text
 88 xpyq forecast jobs
@@ -76,8 +85,87 @@ branch, that can mean up to:
 = up to 176 remote xpyq jobs
 ```
 
+With the IBM backend each rebalance submits one QAOA circuit job to the IBM QPU
+(plus polling overhead). The forecast still runs locally, so the job count is
+halved compared to xpyq.
+
 For quick debugging, use a larger rebalance interval to reduce the number of
 remote jobs.
+
+## Quantum backend selection
+
+The quantum backend controls which remote compute service (if any) powers the
+quantum branch. It can be changed from the **web UI**, the **CLI**, or
+**programmatically** in Python.
+
+### Web UI
+
+Open the app in your browser (default `http://localhost:5000`). In the
+**Run Pipeline** panel, find the **Quantum backend** dropdown and choose:
+
+| Option | Label shown | Requires |
+|--------|-------------|----------|
+| `local` | Local (classical) | nothing |
+| `xpyq` | XpyQ | `XPYQ_KEY` set server-side |
+| `ibm` | IBM Quantum | `IBM_TOKEN` set server-side |
+
+Options whose credentials are not configured on the server are automatically
+greyed out by the UI. The selected value is sent with every `/api/run` request.
+
+### CLI / environment variables
+
+Set `QUANTUM_BACKEND` before running any script:
+
+```bash
+# XpyQ (default)
+set -a; source .env; set +a; .venv/bin/python run_master.py
+
+# IBM Quantum
+set -a; source .env; set +a; \
+QUANTUM_BACKEND=ibm \
+.venv/bin/python run_master.py
+
+# Local classical fallback (no credentials needed)
+QUANTUM_BACKEND=local .venv/bin/python run_master.py
+```
+
+### Programmatic
+
+```python
+# XpyQ
+from forecast import QuantumForecaster
+from optimize import QaoaOptimizer
+qf = QuantumForecaster(api_key="<XPYQ_KEY>")
+qo = QaoaOptimizer(api_key="<XPYQ_KEY>")
+
+# IBM Quantum
+qf = QuantumForecaster(backend="ibm")                    # SVD runs classically
+qo = QaoaOptimizer(backend="ibm", ibm_token="<TOKEN>",   # QAOA runs on QPU
+                   ibm_device="ibm_kyoto", shots=1024)
+
+# Local classical
+qf = QuantumForecaster(backend="local")
+qo = QaoaOptimizer(backend="local")
+```
+
+### IBM Quantum — how it works
+
+`QaoaOptimizer` encodes the portfolio QUBO as a **p=1 QAOA circuit**:
+
+1. Map `x'Qx` to an Ising Hamiltonian: `x_i = (1 − Z_i) / 2`.
+2. Apply cost layer (RZZ + RZ gates) and a uniform RX mixer.
+3. Transpile the circuit for the target QPU via Qiskit Runtime.
+4. Submit to `SamplerV2`, poll until done, decode the lowest-energy bitstring
+   as the portfolio selection.
+
+All Qiskit logic lives in `quantum_backends.py`, which is shared between
+`optimize.py` and `server.py`.
+
+`QuantumForecaster` with `backend="ibm"` runs the same factor-signal mathematics
+as the xpyq path but entirely in numpy — IBM QPUs cannot execute arbitrary SVD.
+
+ChaosEngine and CrystalBall automatically use their classical numpy fallbacks
+when the IBM backend is selected (they only use xpyq).
 
 ## Main commands
 
@@ -87,14 +175,23 @@ Create a local `.env` file with your keys:
 XPYQ_KEY=...
 EXA_KEY=...
 OPENROUTER_KEY=...
+IBM_TOKEN=...        # only needed when QUANTUM_BACKEND=ibm
 ```
 
 `.env` is ignored by git.
 
-Run the full comparison:
+Run the full comparison (xpyq backend by default):
 
 ```bash
 set -a; source .env; set +a; .venv/bin/python run_master.py
+```
+
+Run with IBM Quantum as the backend:
+
+```bash
+set -a; source .env; set +a; \
+QUANTUM_BACKEND=ibm \
+.venv/bin/python run_master.py
 ```
 
 Run a faster comparison while debugging xpyq:
@@ -112,7 +209,7 @@ Run the normal baseline only:
 .venv/bin/python run_baseline.py
 ```
 
-Run the older three-way quantum comparison:
+Run the three-way quantum comparison:
 
 ```bash
 set -a; source .env; set +a; .venv/bin/python run_quantum.py
@@ -121,8 +218,12 @@ set -a; source .env; set +a; .venv/bin/python run_quantum.py
 ## Environment knobs
 
 | Variable | Default | Purpose |
-|----------|---------|---------|
-| `XPYQ_KEY` | empty | xpyq bearer token for remote compute. |
+|----------|---------|----------|
+| `QUANTUM_BACKEND` | `xpyq` | Quantum compute backend: `xpyq`, `ibm`, or `local`. |
+| `XPYQ_KEY` | empty | xpyq bearer token. Required when `QUANTUM_BACKEND=xpyq`. |
+| `IBM_TOKEN` | empty | IBM Quantum API token. Required when `QUANTUM_BACKEND=ibm`. |
+| `IBM_DEVICE` | empty | Specific IBM QPU name (e.g. `ibm_kyoto`). Defaults to least-busy. |
+| `IBM_SHOTS` | `1024` | QAOA circuit shot count for IBM backend. |
 | `EXA_KEY` | empty | Exa API key for market intelligence. |
 | `OPENROUTER_KEY` | empty | OpenRouter key for final agent reasoning. |
 | `XPYQ_TIMEOUT` | `20` | Seconds to wait per xpyq job before fallback. |
@@ -276,7 +377,7 @@ the quantum branch must beat.
 ## Quantum branch
 
 The quantum branch keeps the same outer pipeline but swaps the forecast and
-optimizer.
+optimizer. The specific computation depends on the selected backend.
 
 ### Quantum forecast
 
@@ -289,7 +390,7 @@ day 2   -0.006  -0.002
 ...
 ```
 
-It submits Python to xpyq:
+**xpyq backend** — submits Python to xpyq hardware:
 
 ```python
 R = from_numpy(...)
@@ -297,8 +398,14 @@ U_mat, S_mat, Vt_mat = linalg.svd(R)
 U_arr, S_arr, Vt_arr = U_mat.numpy()
 ```
 
-SVD breaks returns into hidden market factors. The code uses the strongest
-factor to estimate whether each ticker should move up or down.
+**ibm or local backend** — runs the identical mathematics in numpy:
+
+```python
+U, S, Vt = np.linalg.svd(R, full_matrices=False)
+```
+
+In both cases, SVD decomposes returns into hidden market factors. The dominant
+factor is used to estimate whether each ticker should move up or down.
 
 ### Quantum optimizer
 
@@ -316,15 +423,18 @@ reward higher expected returns
 penalize risky combinations
 ```
 
-Then it submits the optimization problem to xpyq:
+**xpyq backend** — submits the eigendecomposition to xpyq hardware:
 
 ```python
 Q = from_numpy(...)
 eigvals_mat, eigvecs_mat = linalg.eigh(Q)
-eigvals_arr, eigvecs_arr = eigvals_mat.numpy()
 ```
 
-The lowest-energy vector is decoded into long/short weights.
+The ground-state eigenvector's sign pattern becomes the long/short weights.
+
+**ibm backend** — encodes the QUBO as a p=1 QAOA circuit and runs it on an
+IBM QPU. The lowest-energy measured bitstring is decoded as the portfolio
+selection (binary `{0,1}` mapped to signed `{-1,+1}` weights).
 
 ## Fallback and traceability
 
@@ -376,14 +486,15 @@ numbers are computed in code first, then the agent explains them.
 ## Important files
 
 | File | Purpose |
-|------|---------|
+|------|----------|
 | `run_master.py` | Main normal-vs-quantum comparison runner. |
 | `run_baseline.py` | Normal-only baseline run. |
-| `run_quantum.py` | Older three-way baseline/quantum/full-quantum comparison. |
+| `run_quantum.py` | Three-way baseline/quantum/full-quantum comparison. |
+| `quantum_backends.py` | Shared IBM Quantum QAOA primitives (circuit build, submit, poll, decode). |
 | `contracts.py` | Shared dataclasses and Protocol interfaces, including `AssetClass` enum. |
 | `chaos.py` | Chaos Engine — tail-risk detector using xpyq eigendecomposition and news sentiment. |
-| `forecast.py` | Momentum and xpyq SVD forecast logic. |
-| `optimize.py` | Markowitz, discrete QUBO, and xpyq eig optimizer logic. |
+| `forecast.py` | Momentum, xpyq SVD, and numpy SVD forecast logic; CrystalBall. |
+| `optimize.py` | Markowitz, discrete QUBO, xpyq eigh, and IBM QAOA optimizer logic. |
 | `risk.py` | Covariance + multi-agent VaR/CVaR risk simulation. |
 | `score.py` | Performance and risk scoring. |
 | `intelligence.py` | Exa search, sentiment, and theme extraction. |
@@ -457,8 +568,13 @@ respectively).
 ## Current interpretation
 
 Use the normal branch as the benchmark. Use the quantum branch to test whether
-xpyq-backed factor extraction and QUBO-style optimization can beat that benchmark.
+quantum-backed factor extraction and QUBO-style optimization can beat that benchmark.
 
-If the quantum branch has many fallbacks, the result is not a clean quantum
-advantage test. First verify xpyq completions in the engine trace, then compare
-returns and risk-adjusted scores.
+With **xpyq**, both the forecast (SVD) and the optimizer (eigendecomposition) run on
+xpyq hardware. If the branch has many fallbacks, the result is not a clean quantum
+advantage test — check the engine trace for completion counts before comparing scores.
+
+With **IBM Quantum**, the QAOA optimizer runs on a real QPU. The forecast uses
+classical numpy SVD, which produces the same signals. IBM backend jobs can take
+longer due to QPU queue times; the engine trace will show `ibm_done` instead of
+`xpyq_completed` for optimizer calls.

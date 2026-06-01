@@ -3,7 +3,14 @@ run_master.py  —  normal vs quantum comparison + final agent.
 
 Runs two simulations on the same mock market:
   1. Normal  : MomentumForecaster + MeanVarianceOptimizer
-  2. Quantum : QuantumForecaster + QaoaOptimizer
+  2. Quantum : QuantumForecaster  + QaoaOptimizer
+
+Quantum backend selection (via environment variables):
+  QUANTUM_BACKEND  — "xpyq" (default) | "ibm" | "local"
+  XPYQ_KEY         — xpyq Bearer token      (required when QUANTUM_BACKEND=xpyq)
+  IBM_TOKEN        — IBM Quantum API token   (required when QUANTUM_BACKEND=ibm)
+  IBM_DEVICE       — specific QPU name       (optional; defaults to least-busy)
+  IBM_SHOTS        — QAOA shot count         (optional; default 1024)
 
 Both runs are sent to MasterAgent, which compares them in simple terms and
 recommends what to use next.
@@ -28,12 +35,16 @@ from optimize import MeanVarianceOptimizer, QaoaOptimizer
 from risk import SampleCovRisk
 from score import BacktestScorer, RiskScorer
 
-XPYQ_KEY = os.environ.get("XPYQ_KEY", "")
-EXA_KEY = os.environ.get("EXA_KEY", "")
-OPENROUTER_KEY = os.environ.get("OPENROUTER_KEY", "")
-XPYQ_TIMEOUT = float(os.environ.get("XPYQ_TIMEOUT", "20"))
-RISK_N_PATHS = int(os.environ.get("QUANTINEL_N_PATHS", "10000"))
-N_DAYS = int(os.environ.get("QUANTINEL_N_DAYS", "504"))
+XPYQ_KEY        = os.environ.get("XPYQ_KEY", "")
+EXA_KEY         = os.environ.get("EXA_KEY", "")
+OPENROUTER_KEY  = os.environ.get("OPENROUTER_KEY", "")
+QUANTUM_BACKEND = os.environ.get("QUANTUM_BACKEND", "xpyq")   # "xpyq"|"ibm"|"local"
+IBM_TOKEN       = os.environ.get("IBM_TOKEN", "")
+IBM_DEVICE      = os.environ.get("IBM_DEVICE", "") or None
+IBM_SHOTS       = int(os.environ.get("IBM_SHOTS", "1024"))
+XPYQ_TIMEOUT    = float(os.environ.get("XPYQ_TIMEOUT", "20"))
+RISK_N_PATHS    = int(os.environ.get("QUANTINEL_N_PATHS", "10000"))
+N_DAYS          = int(os.environ.get("QUANTINEL_N_DAYS", "504"))
 REBALANCE_EVERY = int(os.environ.get("QUANTINEL_REBALANCE_EVERY", "5"))
 
 
@@ -180,7 +191,22 @@ def build_trace(normal: dict, quantum: dict) -> tuple[dict, list[str]]:
 
 def main():
     normal_label = "MomentumForecaster + MeanVarianceOptimizer"
-    quantum_label = "QuantumForecaster + QaoaOptimizer (xpyq)"
+
+    if QUANTUM_BACKEND == "ibm":
+        quantum_label = "QuantumForecaster + QaoaOptimizer (IBM Quantum p=1 QAOA)"
+        _q_fcst = QuantumForecaster(backend="ibm", timeout=XPYQ_TIMEOUT)
+        _q_opt  = QaoaOptimizer(
+            backend="ibm", ibm_token=IBM_TOKEN,
+            ibm_device=IBM_DEVICE, shots=IBM_SHOTS, timeout=XPYQ_TIMEOUT,
+        )
+    elif QUANTUM_BACKEND == "xpyq":
+        quantum_label = "QuantumForecaster + QaoaOptimizer (xpyq)"
+        _q_fcst = QuantumForecaster(api_key=XPYQ_KEY, timeout=XPYQ_TIMEOUT)
+        _q_opt  = QaoaOptimizer(api_key=XPYQ_KEY, timeout=XPYQ_TIMEOUT)
+    else:
+        quantum_label = "QuantumForecaster + QaoaOptimizer (local classical)"
+        _q_fcst = QuantumForecaster(backend="local")
+        _q_opt  = QaoaOptimizer(backend="local")
 
     normal_job = (
         "normal",
@@ -191,15 +217,12 @@ def main():
     quantum_job = (
         "quantum",
         quantum_label,
-        QuantumForecaster(api_key=XPYQ_KEY, timeout=XPYQ_TIMEOUT),
-        QaoaOptimizer(api_key=XPYQ_KEY, timeout=XPYQ_TIMEOUT),
+        _q_fcst,
+        _q_opt,
     )
 
-    print("Running normal and quantum simulations in parallel...")
-    if XPYQ_KEY:
-        print("(quantum branch will submit xpyq workloads, with local fallback on timeout/failure)")
-    else:
-        print("(XPYQ_KEY is missing, so the quantum branch will use local fallbacks)")
+    print(f"Running normal and quantum simulations in parallel...")
+    print(f"(quantum backend: {QUANTUM_BACKEND.upper()}")
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         futures = [pool.submit(run_pipeline, *job) for job in (normal_job, quantum_job)]

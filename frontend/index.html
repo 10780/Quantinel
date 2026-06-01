@@ -76,7 +76,12 @@
 
     <div class="grp">
       <h4>Quantum backend</h4>
-      <div class="chk"><input id="use_xpyq" type="checkbox"/><span>Use xpyq in pipeline run</span></div>
+      <label>Pipeline quantum solver</label>
+      <select id="quantum_backend">
+        <option value="local" selected>Local (brute force / greedy)</option>
+        <option value="xpyq">xpyq hardware</option>
+        <option value="ibm">IBM Quantum QPU</option>
+      </select>
       <label>Pipeline poll budget <span class="val" id="ptv">60</span>s</label>
       <input id="poll_timeout" type="range" min="10" max="180" value="60"/>
       <label>Live-queue round length <span class="val" id="qrv">20</span>s</label>

@@ -91,7 +91,7 @@ class ChaosEngine:
         self.lookback = lookback
         self.crash_threshold = crash_threshold
         self.crash_horizon = crash_horizon
-        self.api_key = api_key or os.getenv("XPYQ_KEY", "")
+        self.api_key = os.getenv("XPYQ_KEY", "") if api_key is None else api_key
         self.poll_secs = poll_secs
         self.timeout = timeout
         self._disabled = not bool(self.api_key)
